@@ -16,7 +16,7 @@ REMOTE_ALICE_LG_DIR = /etc/alice-lg
 REMOTE_BIRDWATCHER_DIR = /etc/birdwatcher
 REMOTE_NGINX_DIR = /etc/nginx/sites-available
 
-.PHONY: help deploy deploy-bird deploy-wireguard deploy-systemd deploy-alice-lg deploy-nginx status routes clean install-alice-lg
+.PHONY: help deploy deploy-bird deploy-wireguard deploy-systemd deploy-alice-lg deploy-nginx status routes clean
 
 help:
 	@echo "DN42 Configuration Deployment"
@@ -28,7 +28,6 @@ help:
 	@echo "  deploy-systemd    - Deploy systemd units and reload"
 	@echo "  deploy-alice-lg   - Deploy Alice Looking Glass and Birdwatcher configs"
 	@echo "  deploy-nginx      - Deploy nginx configurations and reload"
-	@echo "  install-alice-lg  - Install Alice-LG and Birdwatcher binaries from source"
 	@echo "  status            - Show Bird BGP and WireGuard status"
 	@echo "  status-bird       - Show Bird BGP status only"
 	@echo "  status-wg         - Show WireGuard status only"
@@ -141,24 +140,6 @@ routes:
 	fi
 	@echo ""
 
-install-alice-lg:
-	@echo "==> Installing Alice-LG and Birdwatcher on $(HOST)..."
-	@echo "  -> Installing Go (if needed)"
-	@ssh $(HOST) "command -v go >/dev/null 2>&1 || sudo apt-get update && sudo apt-get install -y golang-go"
-	@echo "  -> Installing Birdwatcher from source"
-	@ssh $(HOST) "cd /tmp && git clone https://github.com/alice-lg/birdwatcher.git || (cd birdwatcher && git pull)"
-	@ssh $(HOST) "cd /tmp/birdwatcher && go build -o birdwatcher && sudo mv birdwatcher /usr/local/bin/ && sudo chmod +x /usr/local/bin/birdwatcher"
-	@echo "  -> Installing Alice-LG from source"
-	@ssh $(HOST) "cd /tmp && git clone https://github.com/alice-lg/alice-lg.git || (cd alice-lg && git pull)"
-	@ssh $(HOST) "cd /tmp/alice-lg && make linux && sudo mv bin/alice-lg-linux-amd64 /usr/local/bin/alice-lg && sudo chmod +x /usr/local/bin/alice-lg"
-	@echo "  -> Creating alice-lg user and directories"
-	@ssh $(HOST) "sudo useradd -r -s /bin/false alice-lg 2>/dev/null || true"
-	@ssh $(HOST) "sudo mkdir -p /var/lib/alice-lg /etc/alice-lg /etc/birdwatcher"
-	@ssh $(HOST) "sudo chown alice-lg:alice-lg /var/lib/alice-lg"
-	@echo "  -> Adding alice-lg user to bird group for socket access"
-	@ssh $(HOST) "sudo usermod -a -G bird alice-lg"
-	@echo "==> Installation complete!"
-
 deploy-alice-lg: deploy-systemd
 	@echo "==> Deploying Alice-LG and Birdwatcher configurations to $(HOST)..."
 	@echo "  -> Uploading birdwatcher.conf"
@@ -167,9 +148,6 @@ deploy-alice-lg: deploy-systemd
 	@echo "  -> Uploading alice.conf"
 	@scp $(ALICE_LG_DIR)/alice.conf $(HOST):/tmp/alice.conf
 	@ssh $(HOST) "sudo mv /tmp/alice.conf $(REMOTE_ALICE_LG_DIR)/alice.conf && sudo chmod 644 $(REMOTE_ALICE_LG_DIR)/alice.conf"
-	@echo "  -> Downloading Alice-LG UI assets"
-	@ssh $(HOST) "sudo mkdir -p /usr/share/alice-lg && sudo chown alice-lg:alice-lg /usr/share/alice-lg"
-	@ssh $(HOST) "cd /tmp && curl -L https://github.com/alice-lg/alice-lg/releases/latest/download/alice-lg-ui.tar.gz | sudo tar xz -C /usr/share/alice-lg/"
 	@echo "  -> Enabling and starting services"
 	@ssh $(HOST) "sudo systemctl daemon-reload"
 	@ssh $(HOST) "sudo systemctl enable --now birdwatcher.service"
