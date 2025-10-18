@@ -8,6 +8,8 @@ SYSTEMD_DIR = systemd
 SYSTEMD_NETWORKD_DIR = systemd-networkd
 ALICE_LG_DIR = alice-lg
 NGINX_DIR = nginx
+DNS_DIR = dns
+IPTABLES_DIR = iptables
 REMOTE_BIRD_DIR = /etc/bird
 REMOTE_WG_DIR = /etc/wireguard
 REMOTE_SYSTEMD_DIR = /etc/systemd/system
@@ -15,8 +17,10 @@ REMOTE_SYSTEMD_NETWORKD_DIR = /etc/systemd/network
 REMOTE_ALICE_LG_DIR = /etc/alice-lg
 REMOTE_BIRDWATCHER_DIR = /etc/birdwatcher
 REMOTE_NGINX_DIR = /etc/nginx/sites-available
+REMOTE_UNBOUND_DIR = /etc/unbound
+REMOTE_IPTABLES_DIR = /etc/iptables
 
-.PHONY: help deploy deploy-bird deploy-wireguard deploy-systemd deploy-alice-lg deploy-nginx status routes clean
+.PHONY: help deploy deploy-bird deploy-wireguard deploy-systemd deploy-alice-lg deploy-nginx deploy-dns deploy-iptables status routes clean
 
 help:
 	@echo "DN42 Configuration Deployment"
@@ -28,6 +32,8 @@ help:
 	@echo "  deploy-systemd    - Deploy systemd units and reload"
 	@echo "  deploy-alice-lg   - Deploy Alice Looking Glass and Birdwatcher configs"
 	@echo "  deploy-nginx      - Deploy nginx configurations and reload"
+	@echo "  deploy-dns        - Deploy unbound DNS configuration and restart service"
+	@echo "  deploy-iptables   - Deploy iptables rules for DN42 NAT"
 	@echo "  status            - Show Bird BGP and WireGuard status"
 	@echo "  status-bird       - Show Bird BGP status only"
 	@echo "  status-wg         - Show WireGuard status only"
@@ -182,3 +188,43 @@ deploy-nginx:
 		echo "  -> Changes were uploaded but NOT applied"; \
 		exit 1; \
 	fi
+
+deploy-dns:
+	@echo "==> Deploying unbound DNS configuration to $(HOST)..."
+	@echo "  -> Uploading unbound.conf"
+	@scp $(DNS_DIR)/unbound.conf $(HOST):/tmp/unbound.conf
+	@ssh $(HOST) "sudo mv /tmp/unbound.conf $(REMOTE_UNBOUND_DIR)/unbound.conf && sudo chmod 644 $(REMOTE_UNBOUND_DIR)/unbound.conf"
+	@echo "  -> Testing unbound configuration"
+	@if ssh $(HOST) "sudo unbound-checkconf $(REMOTE_UNBOUND_DIR)/unbound.conf" > /dev/null 2>&1; then \
+		echo "  -> Configuration is valid"; \
+		echo "  -> Restarting unbound service"; \
+		ssh $(HOST) "sudo systemctl restart unbound"; \
+		echo "  -> Enabling unbound service"; \
+		ssh $(HOST) "sudo systemctl enable unbound"; \
+		echo "==> DNS deployment complete!"; \
+		echo "  -> Unbound status:"; \
+		ssh $(HOST) "sudo systemctl status unbound --no-pager -l" || true; \
+	else \
+		echo "  -> ERROR: Unbound configuration test failed!"; \
+		echo "  -> Changes were uploaded but NOT applied"; \
+		exit 1; \
+	fi
+
+deploy-iptables: deploy-systemd
+	@echo "==> Deploying iptables rules for DN42 NAT to $(HOST)..."
+	@echo "  -> Creating iptables directory"
+	@ssh $(HOST) "sudo mkdir -p $(REMOTE_IPTABLES_DIR)"
+	@echo "  -> Uploading iptables.rules"
+	@scp $(IPTABLES_DIR)/iptables.rules $(HOST):/tmp/iptables.rules
+	@ssh $(HOST) "sudo mv /tmp/iptables.rules $(REMOTE_IPTABLES_DIR)/iptables.rules && sudo chmod 644 $(REMOTE_IPTABLES_DIR)/iptables.rules"
+	@echo "  -> Uploading ip6tables.rules"
+	@scp $(IPTABLES_DIR)/ip6tables.rules $(HOST):/tmp/ip6tables.rules
+	@ssh $(HOST) "sudo mv /tmp/ip6tables.rules $(REMOTE_IPTABLES_DIR)/ip6tables.rules && sudo chmod 644 $(REMOTE_IPTABLES_DIR)/ip6tables.rules"
+	@echo "  -> Applying iptables rules"
+	@ssh $(HOST) "sudo iptables-restore < $(REMOTE_IPTABLES_DIR)/iptables.rules"
+	@ssh $(HOST) "sudo ip6tables-restore < $(REMOTE_IPTABLES_DIR)/ip6tables.rules"
+	@echo "  -> Enabling iptables-restore service"
+	@ssh $(HOST) "sudo systemctl enable --now iptables-restore.service"
+	@echo "==> Iptables deployment complete!"
+	@echo "  -> Service status:"
+	@ssh $(HOST) "sudo systemctl status iptables-restore.service --no-pager -l" || true

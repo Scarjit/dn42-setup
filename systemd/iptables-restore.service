@@ -1,0 +1,13 @@
+[Unit]
+Description=Restore iptables rules for DN42
+Before=network-pre.target
+Wants=network-pre.target
+
+[Service]
+Type=oneshot
+ExecStart=/usr/sbin/iptables-restore /etc/iptables/iptables.rules
+ExecStart=/usr/sbin/ip6tables-restore /etc/iptables/ip6tables.rules
+RemainAfterExit=yes
+
+[Install]
+WantedBy=multi-user.target
