@@ -1,0 +1,15 @@
+[Unit]
+Description=DN42 IP Address Assignment
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+RemainAfterExit=yes
+ExecStart=/usr/bin/ip addr add 172.20.13.2/27 dev dn42-dummy
+ExecStart=/usr/bin/ip addr add fd30:366:4000::2/48 dev dn42-dummy
+ExecStop=/usr/bin/ip addr del 172.20.13.2/27 dev dn42-dummy
+ExecStop=/usr/bin/ip addr del fd30:366:4000::2/48 dev dn42-dummy
+
+[Install]
+WantedBy=multi-user.target

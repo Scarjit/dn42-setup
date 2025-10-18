@@ -1,0 +1,11 @@
+[Match]
+Name=dn42-dummy
+
+[Network]
+# DN42 Router IPs
+Address=172.20.13.1/27
+Address=fd30:366:4000::1/48
+
+# Nginx server IPs
+Address=172.20.13.2/27
+Address=fd30:366:4000::2/48

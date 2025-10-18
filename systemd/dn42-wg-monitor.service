@@ -1,0 +1,10 @@
+[Unit]
+Description=DN42 WireGuard Connection Monitor
+After=network-online.target wg-quick@wg-lenny.service
+
+[Service]
+Type=oneshot
+ExecStart=/usr/local/bin/wg-monitor.sh
+
+[Install]
+WantedBy=multi-user.target

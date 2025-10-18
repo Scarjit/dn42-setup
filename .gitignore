@@ -1,0 +1,8 @@
+# DN42 Registry (separate git repo)
+registry/
+
+# Logs
+*.log
+
+# Temporary files
+*.tmp
