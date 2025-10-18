@@ -61,32 +61,6 @@
 - IPv4 and IPv6 support with MP-BGP
 - WireGuard connection monitoring
 
-## Repository Structure
-
-```
-dn42-setup/
-├── bird/
-│   ├── bird.conf              # Main Bird2 configuration with ROA validation
-│   └── peers/
-│       └── lenny.conf         # BGP peer configurations
-├── wireguard/
-│   ├── wg-lenny.conf          # WireGuard tunnel configs (encrypted with git-crypt)
-│   └── README.md              # Encryption instructions
-├── systemd/
-│   ├── dn42-roa.service       # ROA update service
-│   ├── dn42-roa.timer         # ROA update timer (runs every 15m)
-│   ├── dn42-wg-monitor.service # WireGuard monitor service
-│   └── dn42-wg-monitor.timer  # Monitor timer (runs every 5m)
-├── systemd-networkd/
-│   ├── dn42-dummy.netdev      # Dummy interface for DN42 IPs
-│   └── dn42-dummy.network     # IP address assignment
-├── scripts/
-│   └── wg-monitor.sh          # WireGuard connection monitoring script
-├── registry/                  # DN42 registry objects (separate git repo, not tracked)
-├── Makefile                   # Deployment automation
-└── README.md                  # This file
-```
-
 ### Deployment
 
 Run `make help` to see available deployment commands.
