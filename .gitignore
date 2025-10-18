@@ -1,6 +1,9 @@
 # DN42 Registry (separate git repo)
 registry/
 
+# Claude Code settings
+.claude/
+
 # Logs
 *.log
 
