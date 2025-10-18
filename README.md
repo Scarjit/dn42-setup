@@ -31,7 +31,7 @@
 
 ### Peering Steps
 
-1. **Contact me** at ferdinand@linnenberg.dev or via DN42 IRC/Matrix
+1. **Contact me** at ferdinand@linnenberg.dev
 2. **Exchange information**:
    - Your ASN
    - Your WireGuard public key
