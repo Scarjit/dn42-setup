@@ -21,7 +21,8 @@
 ### Prerequisites
 - WireGuard tunnel support
 - BGP daemon (Bird2, FRRouting, etc.)
-- Valid DN42 registry objects
+- Valid DN42 registry objects (mntner, person, AS, inetnum/inet6num)
+- ROA objects registered in the DN42 registry for your prefixes
 
 ### My Endpoint
 - **Public IPv6**: `2a0a:a543:d3f3:80:be24:11ff:fe5d:a0dc`
@@ -54,30 +55,51 @@
 **BGP Daemon**: Bird2 2.17.1
 
 ### Features
-- Automatic ROA table updates (every 15 minutes)
+- **ROA validation enabled** - Only accepts routes with valid ROA entries
+- Automatic ROA table updates (every 15 minutes via systemd timer)
 - Route filtering with strict validation
-- IPv4 and IPv6 support
+- IPv4 and IPv6 support with MP-BGP
+- WireGuard connection monitoring
 
 ## Repository Structure
 
 ```
 dn42-setup/
 ├── bird/
-│   ├── bird.conf          # Main Bird2 configuration
+│   ├── bird.conf              # Main Bird2 configuration with ROA validation
 │   └── peers/
-│       └── lenny.conf     # BGP peer configurations
+│       └── lenny.conf         # BGP peer configurations
 ├── wireguard/
-│   └── wg-lenny.conf      # WireGuard tunnel configurations
+│   ├── wg-lenny.conf          # WireGuard tunnel configs (encrypted with git-crypt)
+│   └── README.md              # Encryption instructions
 ├── systemd/
-│   ├── dn42-roa.service   # ROA update service
-│   └── dn42-roa.timer     # ROA update timer (runs every 15m)
-├── registry/              # DN42 registry objects (for pull requests)
-└── README.md              # This file
+│   ├── dn42-roa.service       # ROA update service
+│   ├── dn42-roa.timer         # ROA update timer (runs every 15m)
+│   ├── dn42-wg-monitor.service # WireGuard monitor service
+│   └── dn42-wg-monitor.timer  # Monitor timer (runs every 5m)
+├── systemd-networkd/
+│   ├── dn42-dummy.netdev      # Dummy interface for DN42 IPs
+│   └── dn42-dummy.network     # IP address assignment
+├── scripts/
+│   └── wg-monitor.sh          # WireGuard connection monitoring script
+├── registry/                  # DN42 registry objects (separate git repo, not tracked)
+├── Makefile                   # Deployment automation
+└── README.md                  # This file
 ```
 
 ### Deployment
 
 Run `make help` to see available deployment commands.
+
+### Git-Crypt
+
+WireGuard configuration files containing private keys are encrypted using git-crypt. To decrypt after cloning:
+
+```bash
+git-crypt unlock
+```
+
+You'll need the authorized GPG private key to decrypt the files.
 
 ## Resources
 
