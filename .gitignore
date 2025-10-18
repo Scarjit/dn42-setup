@@ -1,6 +1,9 @@
 # DN42 Registry (separate git repo)
 registry/
 
+# peerfinder.dn42.dev discovery script
+peerfinder
+
 # Claude Code settings
 .claude/
 
