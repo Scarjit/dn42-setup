@@ -1,0 +1,23 @@
+[Unit]
+Description=Birdwatcher - BIRD API for Alice Looking Glass
+Documentation=https://github.com/alice-lg/birdwatcher
+After=network-online.target bird.service
+Requires=bird.service
+
+[Service]
+Type=simple
+User=bird
+Group=bird
+ExecStart=/usr/local/bin/birdwatcher -config /etc/birdwatcher/birdwatcher.conf
+Restart=on-failure
+RestartSec=5s
+
+# Security hardening
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=true
+ReadWritePaths=/run/bird
+
+[Install]
+WantedBy=multi-user.target

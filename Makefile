@@ -6,12 +6,17 @@ BIRD_DIR = bird
 WG_DIR = wireguard
 SYSTEMD_DIR = systemd
 SYSTEMD_NETWORKD_DIR = systemd-networkd
+ALICE_LG_DIR = alice-lg
+NGINX_DIR = nginx
 REMOTE_BIRD_DIR = /etc/bird
 REMOTE_WG_DIR = /etc/wireguard
 REMOTE_SYSTEMD_DIR = /etc/systemd/system
 REMOTE_SYSTEMD_NETWORKD_DIR = /etc/systemd/network
+REMOTE_ALICE_LG_DIR = /etc/alice-lg
+REMOTE_BIRDWATCHER_DIR = /etc/birdwatcher
+REMOTE_NGINX_DIR = /etc/nginx/sites-available
 
-.PHONY: help deploy deploy-bird deploy-wireguard deploy-systemd status routes clean
+.PHONY: help deploy deploy-bird deploy-wireguard deploy-systemd deploy-alice-lg deploy-nginx status routes clean install-alice-lg
 
 help:
 	@echo "DN42 Configuration Deployment"
@@ -21,6 +26,9 @@ help:
 	@echo "  deploy-bird       - Deploy Bird2 configuration and reconfigure"
 	@echo "  deploy-wireguard  - Deploy WireGuard configurations and restart tunnels"
 	@echo "  deploy-systemd    - Deploy systemd units and reload"
+	@echo "  deploy-alice-lg   - Deploy Alice Looking Glass and Birdwatcher configs"
+	@echo "  deploy-nginx      - Deploy nginx configurations and reload"
+	@echo "  install-alice-lg  - Install Alice-LG and Birdwatcher binaries from source"
 	@echo "  status            - Show Bird BGP and WireGuard status"
 	@echo "  status-bird       - Show Bird BGP status only"
 	@echo "  status-wg         - Show WireGuard status only"
@@ -132,3 +140,65 @@ routes:
 		ssh $(HOST) "sudo birdc show route for ::/0" || true; \
 	fi
 	@echo ""
+
+install-alice-lg:
+	@echo "==> Installing Alice-LG and Birdwatcher on $(HOST)..."
+	@echo "  -> Installing Go (if needed)"
+	@ssh $(HOST) "command -v go >/dev/null 2>&1 || sudo apt-get update && sudo apt-get install -y golang-go"
+	@echo "  -> Installing Birdwatcher"
+	@ssh $(HOST) "GOBIN=/usr/local/bin sudo -E go install github.com/alice-lg/birdwatcher@latest"
+	@echo "  -> Installing Alice-LG"
+	@ssh $(HOST) "GOBIN=/usr/local/bin sudo -E go install github.com/alice-lg/alice-lg@latest"
+	@echo "  -> Creating alice-lg user and directories"
+	@ssh $(HOST) "sudo useradd -r -s /bin/false alice-lg 2>/dev/null || true"
+	@ssh $(HOST) "sudo mkdir -p /var/lib/alice-lg /etc/alice-lg /etc/birdwatcher"
+	@ssh $(HOST) "sudo chown alice-lg:alice-lg /var/lib/alice-lg"
+	@echo "  -> Adding alice-lg user to bird group for socket access"
+	@ssh $(HOST) "sudo usermod -a -G bird alice-lg"
+	@echo "==> Installation complete!"
+
+deploy-alice-lg: deploy-systemd
+	@echo "==> Deploying Alice-LG and Birdwatcher configurations to $(HOST)..."
+	@echo "  -> Uploading birdwatcher.conf"
+	@scp $(ALICE_LG_DIR)/birdwatcher.conf $(HOST):/tmp/birdwatcher.conf
+	@ssh $(HOST) "sudo mv /tmp/birdwatcher.conf $(REMOTE_BIRDWATCHER_DIR)/birdwatcher.conf && sudo chmod 644 $(REMOTE_BIRDWATCHER_DIR)/birdwatcher.conf"
+	@echo "  -> Uploading alice.conf"
+	@scp $(ALICE_LG_DIR)/alice.conf $(HOST):/tmp/alice.conf
+	@ssh $(HOST) "sudo mv /tmp/alice.conf $(REMOTE_ALICE_LG_DIR)/alice.conf && sudo chmod 644 $(REMOTE_ALICE_LG_DIR)/alice.conf"
+	@echo "  -> Downloading Alice-LG UI assets"
+	@ssh $(HOST) "sudo mkdir -p /usr/share/alice-lg && sudo chown alice-lg:alice-lg /usr/share/alice-lg"
+	@ssh $(HOST) "cd /tmp && curl -L https://github.com/alice-lg/alice-lg/releases/latest/download/alice-lg-ui.tar.gz | sudo tar xz -C /usr/share/alice-lg/"
+	@echo "  -> Enabling and starting services"
+	@ssh $(HOST) "sudo systemctl daemon-reload"
+	@ssh $(HOST) "sudo systemctl enable --now birdwatcher.service"
+	@ssh $(HOST) "sudo systemctl enable --now alice-lg.service"
+	@echo "==> Alice-LG deployment complete!"
+	@echo "  -> Birdwatcher status:"
+	@ssh $(HOST) "sudo systemctl status birdwatcher.service --no-pager -l" || true
+	@echo "  -> Alice-LG status:"
+	@ssh $(HOST) "sudo systemctl status alice-lg.service --no-pager -l" || true
+
+deploy-nginx:
+	@echo "==> Deploying nginx configurations to $(HOST)..."
+	@for conf in $(NGINX_DIR)/*.conf; do \
+		if [ -f "$$conf" ]; then \
+			filename=$$(basename "$$conf"); \
+			echo "  -> Uploading $$filename"; \
+			scp "$$conf" $(HOST):/tmp/$$filename; \
+			ssh $(HOST) "sudo mv /tmp/$$filename $(REMOTE_NGINX_DIR)/$$filename && sudo chmod 644 $(REMOTE_NGINX_DIR)/$$filename"; \
+			sitename=$$(basename "$$conf" .conf); \
+			echo "  -> Enabling site: $$sitename"; \
+			ssh $(HOST) "sudo ln -sf $(REMOTE_NGINX_DIR)/$$filename /etc/nginx/sites-enabled/$$filename 2>/dev/null || true"; \
+		fi \
+	done
+	@echo "  -> Testing nginx configuration"
+	@if ssh $(HOST) "sudo nginx -t" > /dev/null 2>&1; then \
+		echo "  -> Configuration is valid"; \
+		echo "  -> Reloading nginx"; \
+		ssh $(HOST) "sudo systemctl reload nginx"; \
+		echo "==> Nginx deployment complete!"; \
+	else \
+		echo "  -> ERROR: Nginx configuration test failed!"; \
+		echo "  -> Changes were uploaded but NOT applied"; \
+		exit 1; \
+	fi
