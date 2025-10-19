@@ -125,7 +125,7 @@ status: status-bird status-wg
 
 status-bird:
 	@echo "==> Bird2 BGP Status:"
-	@ssh $(HOST) "sudo birdc show protocols" | grep -E "^BIRD|^name|bgp" || true
+	@ssh $(HOST) "sudo birdc show protocols" | grep -E "BGP|^Name" || true
 	@echo ""
 
 status-wg:
