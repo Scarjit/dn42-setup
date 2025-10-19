@@ -6,7 +6,7 @@ BIRD_DIR = bird
 WG_DIR = wireguard
 SYSTEMD_DIR = systemd
 SYSTEMD_NETWORKD_DIR = systemd-networkd
-ALICE_LG_DIR = alice-lg
+BIRD_LG_DIR = bird-lg
 NGINX_DIR = nginx
 DNS_DIR = dns
 IPTABLES_DIR = iptables
@@ -14,13 +14,11 @@ REMOTE_BIRD_DIR = /etc/bird
 REMOTE_WG_DIR = /etc/wireguard
 REMOTE_SYSTEMD_DIR = /etc/systemd/system
 REMOTE_SYSTEMD_NETWORKD_DIR = /etc/systemd/network
-REMOTE_ALICE_LG_DIR = /etc/alice-lg
-REMOTE_BIRDWATCHER_DIR = /etc/birdwatcher
 REMOTE_NGINX_DIR = /etc/nginx/sites-available
 REMOTE_UNBOUND_DIR = /etc/unbound
 REMOTE_IPTABLES_DIR = /etc/iptables
 
-.PHONY: help deploy deploy-bird deploy-wireguard deploy-systemd deploy-alice-lg deploy-nginx deploy-dns deploy-iptables status routes clean
+.PHONY: help deploy deploy-bird deploy-wireguard deploy-systemd deploy-bird-lg deploy-nginx deploy-dns deploy-iptables status routes clean
 
 help:
 	@echo "DN42 Configuration Deployment"
@@ -30,7 +28,7 @@ help:
 	@echo "  deploy-bird       - Deploy Bird2 configuration and reconfigure"
 	@echo "  deploy-wireguard  - Deploy WireGuard configurations and restart tunnels"
 	@echo "  deploy-systemd    - Deploy systemd units and reload"
-	@echo "  deploy-alice-lg   - Deploy Alice Looking Glass and Birdwatcher configs"
+	@echo "  deploy-bird-lg    - Deploy Bird-LG-Go Looking Glass"
 	@echo "  deploy-nginx      - Deploy nginx configurations and reload"
 	@echo "  deploy-dns        - Deploy unbound DNS configuration and restart service"
 	@echo "  deploy-iptables   - Deploy iptables rules for DN42 NAT"
@@ -150,23 +148,23 @@ routes:
 	fi
 	@echo ""
 
-deploy-alice-lg: deploy-systemd
-	@echo "==> Deploying Alice-LG and Birdwatcher configurations to $(HOST)..."
-	@echo "  -> Uploading birdwatcher.conf"
-	@scp $(ALICE_LG_DIR)/birdwatcher.conf $(HOST):/tmp/birdwatcher.conf
-	@ssh $(HOST) "sudo mv /tmp/birdwatcher.conf $(REMOTE_BIRDWATCHER_DIR)/birdwatcher.conf && sudo chmod 644 $(REMOTE_BIRDWATCHER_DIR)/birdwatcher.conf"
-	@echo "  -> Uploading alice.conf"
-	@scp $(ALICE_LG_DIR)/alice.conf $(HOST):/tmp/alice.conf
-	@ssh $(HOST) "sudo mv /tmp/alice.conf $(REMOTE_ALICE_LG_DIR)/alice.conf && sudo chmod 644 $(REMOTE_ALICE_LG_DIR)/alice.conf"
-	@echo "  -> Enabling and starting services"
+deploy-bird-lg:
+	@echo "==> Deploying Bird-LG-Go Looking Glass to $(HOST)..."
+	@echo "  -> Uploading systemd service files"
+	@scp $(BIRD_LG_DIR)/bird-lg-proxy.service $(HOST):/tmp/bird-lg-proxy.service
+	@ssh $(HOST) "sudo mv /tmp/bird-lg-proxy.service $(REMOTE_SYSTEMD_DIR)/bird-lg-proxy.service && sudo chmod 644 $(REMOTE_SYSTEMD_DIR)/bird-lg-proxy.service"
+	@scp $(BIRD_LG_DIR)/bird-lg-frontend.service $(HOST):/tmp/bird-lg-frontend.service
+	@ssh $(HOST) "sudo mv /tmp/bird-lg-frontend.service $(REMOTE_SYSTEMD_DIR)/bird-lg-frontend.service && sudo chmod 644 $(REMOTE_SYSTEMD_DIR)/bird-lg-frontend.service"
+	@echo "  -> Reloading systemd daemon"
 	@ssh $(HOST) "sudo systemctl daemon-reload"
-	@ssh $(HOST) "sudo systemctl enable --now birdwatcher.service"
-	@ssh $(HOST) "sudo systemctl enable --now alice-lg.service"
-	@echo "==> Alice-LG deployment complete!"
-	@echo "  -> Birdwatcher status:"
-	@ssh $(HOST) "sudo systemctl status birdwatcher.service --no-pager -l" || true
-	@echo "  -> Alice-LG status:"
-	@ssh $(HOST) "sudo systemctl status alice-lg.service --no-pager -l" || true
+	@echo "  -> Enabling and starting services"
+	@ssh $(HOST) "sudo systemctl enable --now bird-lg-proxy.service"
+	@ssh $(HOST) "sudo systemctl enable --now bird-lg-frontend.service"
+	@echo "==> Bird-LG-Go deployment complete!"
+	@echo "  -> Service status:"
+	@ssh $(HOST) "sudo systemctl status bird-lg-proxy.service --no-pager -l" || true
+	@echo ""
+	@ssh $(HOST) "sudo systemctl status bird-lg-frontend.service --no-pager -l" || true
 
 deploy-nginx:
 	@echo "==> Deploying nginx configurations to $(HOST)..."

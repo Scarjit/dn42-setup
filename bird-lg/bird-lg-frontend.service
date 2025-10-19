@@ -1,0 +1,21 @@
+[Unit]
+Description=Bird-lg-go Frontend
+After=network.target bird-lg-proxy.service
+
+[Service]
+Type=simple
+User=nobody
+Group=nogroup
+ExecStart=/usr/local/bin/bird-lg-frontend \
+    --servers 127.0.0.1 \
+    --listen 127.0.0.1:5000 \
+    --proxy-port 8000 \
+    --whois whois.dn42 \
+    --net-specific-mode dn42 \
+    --title-brand "SCARJIT-MNT" \
+    --navbar-brand "AS4242420257 - DN42"
+Restart=always
+RestartSec=3
+
+[Install]
+WantedBy=multi-user.target
