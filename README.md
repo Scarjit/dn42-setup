@@ -25,7 +25,7 @@
 - ROA objects registered in the DN42 registry for your prefixes
 
 ### My Endpoint
-- **Public IPv6**: `2a0a:a543:d3f3:80:be24:11ff:fe5d:a0dc`
+- **Public IPv6**: `2a0a:a543:d3f3:80:be24:11ff:fe5d:a0dc` (dn42-router.linnenberg.dev via AAAA [prefered])
 - **WireGuard Public Key**: `BsU2BEUpd6aqPqCAyU5kFakuOPRi8i5Ou6v6WJKXEXY=`
 - **WireGuard Port**: 51820
 
