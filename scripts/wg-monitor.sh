@@ -1,7 +1,7 @@
 #!/bin/bash
 # WireGuard Connection Monitor for DN42
 
-INTERFACE="wg-lenny"
+INTERFACE="wg-as4242422729"
 PEER_IP="fdba:4d7b:fb4c::1"
 LOG_FILE="/var/log/dn42-wg-monitor.log"
 

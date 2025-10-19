@@ -51,6 +51,8 @@ deploy-bird:
 	@ssh $(HOST) "sudo mv /tmp/bird.conf $(REMOTE_BIRD_DIR)/bird.conf && sudo chmod 644 $(REMOTE_BIRD_DIR)/bird.conf"
 	@echo "  -> Creating peers directory"
 	@ssh $(HOST) "sudo mkdir -p $(REMOTE_BIRD_DIR)/peers"
+	@echo "  -> Cleaning old peer configurations"
+	@ssh $(HOST) "sudo rm -f $(REMOTE_BIRD_DIR)/peers/*.conf"
 	@echo "  -> Uploading peer configurations"
 	@for peer in $(BIRD_DIR)/peers/*.conf; do \
 		if [ -f "$$peer" ]; then \
@@ -74,6 +76,8 @@ deploy-bird:
 
 deploy-wireguard:
 	@echo "==> Deploying WireGuard configurations to $(HOST)..."
+	@echo "  -> Cleaning old WireGuard configurations"
+	@ssh $(HOST) "sudo rm -f $(REMOTE_WG_DIR)/*.conf"
 	@for conf in $(WG_DIR)/*.conf; do \
 		if [ -f "$$conf" ]; then \
 			filename=$$(basename "$$conf"); \
