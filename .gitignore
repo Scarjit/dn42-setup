@@ -6,6 +6,7 @@ peerfinder
 
 # Claude Code settings
 .claude/
+.playwright-mcp
 
 # Logs
 *.log
