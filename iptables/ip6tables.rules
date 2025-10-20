@@ -4,6 +4,6 @@
 :INPUT ACCEPT [0:0]
 :OUTPUT ACCEPT [0:0]
 :POSTROUTING ACCEPT [7:1311]
--A POSTROUTING -s 2a0a:a543:d3f3:80::/64 -d fd00::/8 -j MASQUERADE
+-A POSTROUTING -s 2a0a:a543:d3f3:80::/64 -d fd00::/8 -o wg+ -j SNAT --to-source fd30:366:4000::1
 COMMIT
 # Completed on Sat Oct 18 23:48:53 2025
