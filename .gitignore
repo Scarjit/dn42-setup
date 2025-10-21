@@ -14,3 +14,7 @@ peerfinder
 # Temporary files
 *.tmp
 dnssec-keys.backup/
+
+# Autopeer API
+autopeer/api/.env
+autopeer/api/target/
