@@ -1,5 +1,5 @@
-# DN42 Registry (separate git repo)
-registry/
+# DN42 Registry (separate git repo at root level only)
+/registry/
 
 # peerfinder.dn42.dev discovery script
 peerfinder

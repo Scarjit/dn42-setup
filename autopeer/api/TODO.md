@@ -18,7 +18,7 @@ Flow: Generate skeleton config with `[Challenge]` → User authenticates → Bui
 - [x] Parse WireGuard config files (with custom sections)
 - [x] Write WireGuard config files (with custom sections)
 - [x] Implement DN42 registry sync (git clone/pull with auth)
-- [ ] Parse AS objects from registry (extract ASN, public keys)
+- [x] Parse AS objects from registry (extract ASN, PGP fingerprints, verify keys)
 - [x] Generate random challenge codes
 - [x] Verify GPG signatures (pure Rust rpgp library)
 - [x] Derive WireGuard port from ASN (port 3XXXX from AS424242XXXX) - implemented in design
