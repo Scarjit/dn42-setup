@@ -9,6 +9,7 @@ SYSTEMD_NETWORKD_DIR = systemd-networkd
 BIRD_LG_DIR = bird-lg
 NGINX_DIR = nginx
 DNS_DIR = dns
+NSD_DIR = nsd
 IPTABLES_DIR = iptables
 REMOTE_BIRD_DIR = /etc/bird
 REMOTE_WG_DIR = /etc/wireguard
@@ -16,9 +17,10 @@ REMOTE_SYSTEMD_DIR = /etc/systemd/system
 REMOTE_SYSTEMD_NETWORKD_DIR = /etc/systemd/network
 REMOTE_NGINX_DIR = /etc/nginx/sites-available
 REMOTE_UNBOUND_DIR = /etc/unbound
+REMOTE_NSD_DIR = /etc/nsd
 REMOTE_IPTABLES_DIR = /etc/iptables
 
-.PHONY: help deploy deploy-bird deploy-wireguard deploy-systemd deploy-bird-lg deploy-nginx deploy-dns deploy-iptables status routes clean
+.PHONY: help deploy deploy-bird deploy-wireguard deploy-systemd deploy-bird-lg deploy-nginx deploy-dns deploy-nsd deploy-iptables status routes clean
 
 help:
 	@echo "DN42 Configuration Deployment"
@@ -31,6 +33,7 @@ help:
 	@echo "  deploy-bird-lg    - Deploy Bird-LG-Go Looking Glass"
 	@echo "  deploy-nginx      - Deploy nginx configurations and reload"
 	@echo "  deploy-dns        - Deploy unbound DNS configuration and restart service"
+	@echo "  deploy-nsd        - Deploy NSD authoritative DNS server and zones"
 	@echo "  deploy-iptables   - Deploy iptables rules for DN42 NAT"
 	@echo "  status            - Show Bird BGP and WireGuard status"
 	@echo "  status-bird       - Show Bird BGP status only"
@@ -230,3 +233,35 @@ deploy-iptables: deploy-systemd
 	@echo "==> Iptables deployment complete!"
 	@echo "  -> Service status:"
 	@ssh $(HOST) "sudo systemctl status iptables-restore.service --no-pager -l" || true
+
+deploy-nsd:
+	@echo "==> Deploying NSD authoritative DNS server to $(HOST)..."
+	@echo "  -> Creating NSD directories"
+	@ssh $(HOST) "sudo mkdir -p $(REMOTE_NSD_DIR)/zones"
+	@echo "  -> Uploading nsd.conf"
+	@scp $(NSD_DIR)/nsd.conf $(HOST):/tmp/nsd.conf
+	@ssh $(HOST) "sudo mv /tmp/nsd.conf $(REMOTE_NSD_DIR)/nsd.conf && sudo chmod 644 $(REMOTE_NSD_DIR)/nsd.conf"
+	@echo "  -> Uploading signed zone files"
+	@for zone in $(NSD_DIR)/zones/*.signed; do \
+		if [ -f "$$zone" ]; then \
+			filename=$$(basename "$$zone"); \
+			echo "     - $$filename"; \
+			scp "$$zone" $(HOST):/tmp/$$filename; \
+			ssh $(HOST) "sudo mv /tmp/$$filename $(REMOTE_NSD_DIR)/zones/$$filename && sudo chmod 644 $(REMOTE_NSD_DIR)/zones/$$filename"; \
+		fi \
+	done
+	@echo "  -> Testing NSD configuration"
+	@if ssh $(HOST) "sudo nsd-checkconf $(REMOTE_NSD_DIR)/nsd.conf" > /dev/null 2>&1; then \
+		echo "  -> Configuration is valid"; \
+		echo "  -> Restarting NSD service"; \
+		ssh $(HOST) "sudo systemctl restart nsd"; \
+		echo "  -> Enabling NSD service"; \
+		ssh $(HOST) "sudo systemctl enable nsd"; \
+		echo "==> NSD deployment complete!"; \
+		echo "  -> NSD status:"; \
+		ssh $(HOST) "sudo systemctl status nsd --no-pager -l" || true; \
+	else \
+		echo "  -> ERROR: NSD configuration test failed!"; \
+		echo "  -> Changes were uploaded but NOT applied"; \
+		exit 1; \
+	fi
