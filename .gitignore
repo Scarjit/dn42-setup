@@ -13,3 +13,4 @@ peerfinder
 
 # Temporary files
 *.tmp
+dnssec-keys.backup/
