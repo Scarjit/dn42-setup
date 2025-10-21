@@ -303,7 +303,6 @@ source:             DN42
     }
 
     #[test]
-    #[ignore] // Requires registry to be synced
     fn test_get_as_object_from_registry() {
         dotenvy::dotenv().ok();
         let registry_path = std::env::var("DN42_REGISTRY_PATH")
@@ -315,7 +314,6 @@ source:             DN42
     }
 
     #[test]
-    #[ignore] // Requires registry to be synced
     fn test_get_pgp_fingerprint_and_verify() {
         dotenvy::dotenv().ok();
         let registry_path = std::env::var("DN42_REGISTRY_PATH")

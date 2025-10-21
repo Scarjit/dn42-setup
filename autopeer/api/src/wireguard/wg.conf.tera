@@ -1,0 +1,37 @@
+[Interface]
+{% for addr in interface_address -%}
+Address = {{ addr }}
+{% endfor -%}
+PrivateKey = {{ interface_private_key }}
+ListenPort = {{ interface_listen_port }}
+{% if interface_table -%}
+Table = {{ interface_table }}
+{% endif %}
+{% if peer -%}
+
+[Peer]
+PublicKey = {{ peer.public_key }}
+{% if peer.endpoint -%}
+Endpoint = {{ peer.endpoint }}
+{% endif -%}
+{% for ip in peer.allowed_ips -%}
+AllowedIPs = {{ ip }}
+{% endfor -%}
+{% if peer.persistent_keepalive -%}
+PersistentKeepalive = {{ peer.persistent_keepalive }}
+{% endif %}
+{%- endif %}
+{% if challenge -%}
+
+[Challenge]
+Code = {{ challenge.code }}
+ASN = {{ challenge.asn }}
+{%- endif %}
+{% if bgp -%}
+
+[BGP]
+MPBGP = {% if bgp.mpbgp %}on{% else %}off{% endif %}
+ExtendedNextHop = {% if bgp.extended_next_hop %}true{% else %}false{% endif %}
+Local = {{ bgp.local }}
+Neighbor = {{ bgp.neighbor }}
+{%- endif %}

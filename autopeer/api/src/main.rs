@@ -1,4 +1,7 @@
+pub mod bird;
 pub mod challenge;
+pub mod config;
+pub mod ipalloc;
 pub mod registry;
 pub mod wireguard;
 

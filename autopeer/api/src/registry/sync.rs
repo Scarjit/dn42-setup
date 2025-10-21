@@ -1,36 +1,9 @@
+use crate::config::RegistryConfig;
 use git2::{Cred, FetchOptions, RemoteCallbacks, Repository};
-use std::env;
-use std::path::{Path, PathBuf};
+use std::path::Path;
+use std::sync::Mutex;
 
-pub struct RegistryConfig {
-    pub url: String,
-    pub path: PathBuf,
-    pub username: String,
-    pub token: String,
-}
-
-impl RegistryConfig {
-    /// Load configuration from environment variables
-    pub fn from_env() -> Result<Self, String> {
-        let url = env::var("DN42_REGISTRY_URL")
-            .unwrap_or_else(|_| "https://git.dn42.dev/dn42/registry".to_string());
-
-        let path =
-            env::var("DN42_REGISTRY_PATH").unwrap_or_else(|_| "./data/dn42-registry".to_string());
-
-        let username =
-            env::var("DN42_GIT_USERNAME").map_err(|_| "DN42_GIT_USERNAME not set".to_string())?;
-
-        let token = env::var("DN42_GIT_TOKEN").map_err(|_| "DN42_GIT_TOKEN not set".to_string())?;
-
-        Ok(RegistryConfig {
-            url,
-            path: PathBuf::from(path),
-            username,
-            token,
-        })
-    }
-}
+static REGISTRY_LOCK: Mutex<()> = Mutex::new(());
 
 pub struct RegistrySync {
     config: RegistryConfig,
@@ -41,10 +14,25 @@ impl RegistrySync {
         Self { config }
     }
 
-    /// Clone or update the DN42 registry
+    /// Clone or update the DN42 registry (thread-safe)
     pub fn sync(&self) -> Result<(), String> {
+        // Acquire lock to ensure only one thread syncs at a time
+        let _lock = REGISTRY_LOCK
+            .lock()
+            .map_err(|e| format!("Failed to acquire lock: {}", e))?;
+
         if self.config.path.exists() {
-            self.pull()
+            // Try to pull, if it fails remove and re-clone
+            match self.pull() {
+                Ok(()) => Ok(()),
+                Err(_e) => {
+                    // Remove corrupted repository
+                    std::fs::remove_dir_all(&self.config.path)
+                        .map_err(|e| format!("Failed to remove corrupted repo: {}", e))?;
+                    // Re-clone
+                    self.clone()
+                }
+            }
         } else {
             self.clone()
         }
@@ -149,9 +137,9 @@ impl RegistrySync {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use std::path::PathBuf;
 
     #[test]
-    #[ignore] // Run with: cargo test -- --ignored
     fn test_actual_sync() {
         // Load .env
         dotenvy::dotenv().ok();
@@ -167,35 +155,22 @@ mod tests {
     }
 
     #[test]
-    fn test_registry_config_from_env() {
-        // Set test environment variables
-        env::set_var("DN42_REGISTRY_URL", "https://test.example.com/registry.git");
-        env::set_var("DN42_REGISTRY_PATH", "/tmp/test-registry");
-        env::set_var("DN42_GIT_USERNAME", "testuser");
-        env::set_var("DN42_GIT_TOKEN", "testtoken");
+    fn test_registry_sync_with_custom_config() {
+        // Create config directly without using env vars
+        // Uses same path as test_actual_sync, but thread-safe thanks to mutex
+        dotenvy::dotenv().ok();
 
-        let config = RegistryConfig::from_env().unwrap();
-        assert_eq!(config.url, "https://test.example.com/registry.git");
-        assert_eq!(config.path, PathBuf::from("/tmp/test-registry"));
-        assert_eq!(config.username, "testuser");
-        assert_eq!(config.token, "testtoken");
+        // Load from env for credentials, but create config directly
+        let config = RegistryConfig::new(
+            "https://git.dn42.dev/dn42/registry".to_string(),
+            PathBuf::from("./data/dn42-registry"),
+            std::env::var("DN42_GIT_USERNAME").unwrap(),
+            std::env::var("DN42_GIT_TOKEN").unwrap(),
+        );
 
-        // Clean up
-        env::remove_var("DN42_REGISTRY_URL");
-        env::remove_var("DN42_REGISTRY_PATH");
-        env::remove_var("DN42_GIT_USERNAME");
-        env::remove_var("DN42_GIT_TOKEN");
-    }
-
-    #[test]
-    fn test_registry_config_defaults() {
-        // Remove all env vars to test defaults
-        env::remove_var("DN42_REGISTRY_URL");
-        env::remove_var("DN42_REGISTRY_PATH");
-        env::remove_var("DN42_GIT_USERNAME");
-        env::remove_var("DN42_GIT_TOKEN");
-
-        let result = RegistryConfig::from_env();
-        assert!(result.is_err()); // Should fail without username/token
+        let sync = RegistrySync::new(config);
+        let result = sync.sync();
+        assert!(result.is_ok(), "Sync failed: {:?}", result);
+        assert!(sync.registry_path().exists());
     }
 }

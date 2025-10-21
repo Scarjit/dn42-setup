@@ -3,14 +3,14 @@
 ## Design: WireGuard Config as Source of Truth
 
 WireGuard configs will contain custom sections:
-- `[Challenge]` - random code, ASN, timestamp, status (pending/validated/deployed)
+- `[Challenge]` - random code and ASN for authentication
 - `[BGP]` - BGP settings (MPBGP, ExtendedNextHop, Local IP, Neighbor IP)
 - Standard `[Interface]` and `[Peer]` sections
 
-Flow: Generate skeleton config with `[Challenge]` → User authenticates → Build full config → Deploy
+Flow: Generate skeleton config with `[Challenge]` → User authenticates with GPG signature → Issue JWT token for ASN → Use JWT to deploy config
 
 **Port allocation:** Use port 3XXXX where XXXX = last 4 digits of ASN (e.g. AS4242421234 → port 31234)
-**Authentication:** GPG signatures only (SSH cannot sign arbitrary text)
+**Authentication:** GPG signatures for initial auth, then JWT tokens for subsequent API calls
 
 ## Core Functionality
 
@@ -21,9 +21,10 @@ Flow: Generate skeleton config with `[Challenge]` → User authenticates → Bui
 - [x] Parse AS objects from registry (extract ASN, PGP fingerprints, verify keys)
 - [x] Generate random challenge codes
 - [x] Verify GPG signatures (pure Rust rpgp library)
-- [x] Derive WireGuard port from ASN (port 3XXXX from AS424242XXXX) - implemented in design
-- [ ] Allocate tunnel IP addresses (IPv4 and IPv6 link-local)
-- [ ] Generate BIRD BGP peer configuration files
+- [x] Derive WireGuard port from ASN (port 3XXXX from AS424242XXXX)
+- [x] Allocate tunnel IP addresses (IPv6 link-local from ASN: fe80::{peer}:{my}:{0/1})
+- [x] Generate BIRD BGP peer configuration files
+- [ ] Implement JWT token generation and verification for authenticated ASNs
 - [ ] Deploy WireGuard configuration (wg-quick or systemd)
 - [ ] Reload BIRD configuration (birdc configure)
 - [ ] Create API endpoints:

@@ -5,6 +5,7 @@ use std::collections::HashMap;
 use std::fmt;
 use std::fs;
 use std::path::Path;
+use tera::{Context, Tera};
 
 /// WireGuard interface configuration
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
@@ -29,8 +30,6 @@ pub struct PeerConfig {
 pub struct ChallengeConfig {
     pub code: String,
     pub asn: u32,
-    pub status: String,
-    pub timestamp: Option<String>,
 }
 
 /// Custom BGP section for autopeer
@@ -85,81 +84,40 @@ impl WgConfig {
 
     /// Write config to file
     pub fn to_file<P: AsRef<Path>>(&self, path: P) -> Result<(), String> {
-        let content = self.as_string();
+        let content = self.as_string()?;
         fs::write(path, content).map_err(|e| format!("Failed to write file: {}", e))
     }
 
-    /// Convert config to string representation
-    fn as_string(&self) -> String {
-        let mut result = String::new();
+    /// Convert config to string representation using Tera template
+    fn as_string(&self) -> Result<String, String> {
+        // Load template
+        let mut tera = Tera::default();
+        let template = include_str!("wg.conf.tera");
+        tera.add_raw_template("wg.conf", template)
+            .map_err(|e| format!("Failed to parse template: {}", e))?;
 
-        // Write Interface section
-        result.push_str("[Interface]\n");
-        for addr in &self.interface.address {
-            result.push_str(&format!("Address = {}\n", addr));
-        }
-        result.push_str(&format!("PrivateKey = {}\n", self.interface.private_key));
-        result.push_str(&format!("ListenPort = {}\n", self.interface.listen_port));
-        if let Some(table) = &self.interface.table {
-            result.push_str(&format!("Table = {}\n", table));
-        }
-        result.push('\n');
+        // Create context
+        let mut context = Context::new();
+        context.insert("interface_address", &self.interface.address);
+        context.insert("interface_private_key", &self.interface.private_key);
+        context.insert("interface_listen_port", &self.interface.listen_port);
+        context.insert("interface_table", &self.interface.table);
+        context.insert("peer", &self.peer);
+        context.insert("challenge", &self.challenge);
+        context.insert("bgp", &self.bgp);
 
-        // Write Peer section if present
-        if let Some(peer) = &self.peer {
-            result.push_str("[Peer]\n");
-            result.push_str(&format!("PublicKey = {}\n", peer.public_key));
-            if let Some(endpoint) = &peer.endpoint {
-                result.push_str(&format!("Endpoint = {}\n", endpoint));
-            }
-            for ip in &peer.allowed_ips {
-                result.push_str(&format!("AllowedIPs = {}\n", ip));
-            }
-            if let Some(keepalive) = peer.persistent_keepalive {
-                result.push_str(&format!("PersistentKeepalive = {}\n", keepalive));
-            }
-            result.push('\n');
-        }
-
-        // Write Challenge section if present
-        if let Some(challenge) = &self.challenge {
-            result.push_str("[Challenge]\n");
-            result.push_str(&format!("Code = {}\n", challenge.code));
-            result.push_str(&format!("ASN = {}\n", challenge.asn));
-            result.push_str(&format!("Status = {}\n", challenge.status));
-            if let Some(timestamp) = &challenge.timestamp {
-                result.push_str(&format!("Timestamp = {}\n", timestamp));
-            }
-            result.push('\n');
-        }
-
-        // Write BGP section if present
-        if let Some(bgp) = &self.bgp {
-            result.push_str("[BGP]\n");
-            result.push_str(&format!(
-                "MPBGP = {}\n",
-                if bgp.mpbgp { "on" } else { "off" }
-            ));
-            result.push_str(&format!(
-                "ExtendedNextHop = {}\n",
-                if bgp.extended_next_hop {
-                    "true"
-                } else {
-                    "false"
-                }
-            ));
-            result.push_str(&format!("Local = {}\n", bgp.local));
-            result.push_str(&format!("Neighbor = {}\n", bgp.neighbor));
-            result.push('\n');
-        }
-
-        result
+        // Render template
+        tera.render("wg.conf", &context)
+            .map_err(|e| format!("Failed to render template: {}", e))
     }
 }
 
 impl fmt::Display for WgConfig {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "{}", self.as_string())
+        match self.as_string() {
+            Ok(s) => write!(f, "{}", s),
+            Err(e) => write!(f, "Error rendering config: {}", e),
+        }
     }
 }
 
@@ -290,20 +248,7 @@ fn parse_challenge(
         .parse::<u32>()
         .map_err(|e| format!("Invalid ASN: {}", e))?;
 
-    let status = section
-        .get("Status")
-        .and_then(|v| v.first())
-        .ok_or("Missing Status in [Challenge]")?
-        .clone();
-
-    let timestamp = section.get("Timestamp").and_then(|v| v.first()).cloned();
-
-    Ok(ChallengeConfig {
-        code,
-        asn,
-        status,
-        timestamp,
-    })
+    Ok(ChallengeConfig { code, asn })
 }
 
 fn parse_bgp(
@@ -385,8 +330,6 @@ ListenPort = 31234
 [Challenge]
 Code = AUTOPEER-4242421234-abc123
 ASN = 4242421234
-Status = pending
-Timestamp = 2025-01-01T00:00:00Z
 
 [BGP]
 MPBGP = on
@@ -415,13 +358,11 @@ Neighbor = fe80::2
             challenge: Some(ChallengeConfig {
                 code: "AUTOPEER-TEST".to_string(),
                 asn: 4242421234,
-                status: "pending".to_string(),
-                timestamp: None,
             }),
             bgp: None,
         };
 
-        let serialized = original.as_string();
+        let serialized = original.as_string().unwrap();
         let parsed = WgConfig::from_string(&serialized).unwrap();
 
         assert_eq!(original, parsed);

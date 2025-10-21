@@ -1,0 +1,43 @@
+# AutoPeer: {{ peer_name }} (AS{{ peer_asn }}) - IPv6 Link-Local with MP-BGP and Extended Next Hop
+protocol bgp autopeer_as{{ peer_asn }} from dnpeers {
+    enable extended messages on;
+    local {{ local_ip }} as {{ my_asn }};
+    neighbor {{ peer_ip }} as {{ peer_asn }};
+    interface "{{ interface_name }}";
+    description "AutoPeer - {{ peer_name }} - AS{{ peer_asn }} - IPv6 LL with MP-BGP";
+    direct;
+
+    # Enable MP-BGP: Exchange IPv4 routes over IPv6 session with Extended Next Hop
+    ipv4 {
+        extended next hop yes;
+        import keep filtered;
+        import filter {
+            if is_valid_network_v4() && !is_self_net_v4() then {
+                accept;
+            }
+            reject;
+        };
+        export filter {
+            if is_valid_network_v4() then {
+                accept;
+            }
+            reject;
+        };
+    };
+
+    ipv6 {
+        import keep filtered;
+        import filter {
+            if is_valid_network_v6() && !is_self_net_v6() then {
+                accept;
+            }
+            reject;
+        };
+        export filter {
+            if is_valid_network_v6() then {
+                accept;
+            }
+            reject;
+        };
+    };
+}
