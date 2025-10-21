@@ -1,0 +1,25 @@
+; Zone file for linnenberg.dn42
+; DNSSEC-enabled zone
+$ORIGIN linnenberg.dn42.
+$TTL 3600
+
+; SOA record
+@       IN      SOA     ns1.linnenberg.dn42. ferdinand.linnenberg.dev. (
+                        2025102101      ; Serial (YYYYMMDDNN)
+                        7200            ; Refresh
+                        3600            ; Retry
+                        1209600         ; Expire
+                        3600 )          ; Negative Cache TTL
+
+; NS records
+@       IN      NS      ns1.linnenberg.dn42.
+
+; Nameserver A records
+ns1     IN      A       172.20.13.2
+
+; DNSKEY records (ZSK and KSK)
+@       IN      DNSKEY  256 3 13 kuPBjH+pKQm+UoIuS37iIVVB7I1xmweCC39fiTwYLaUQTtCL5VR7xfSxh1rZAOcuaDBzxDkW//6VnR8LkJTazg==
+@       IN      DNSKEY  257 3 13 8sKcE/HDzVvuHoBg47AChNZ4OI6FhEoRndsI5dw9jIv3TC+nWnr+Y5os2Ktej7ZdKtKh7t5rP8Uxqa+e9gWefA==
+
+; Main domain A record
+@       IN      A       172.20.13.2

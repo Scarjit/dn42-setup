@@ -1,0 +1,27 @@
+; Reverse DNS zone for fd30:366:4000::/48
+; DNSSEC-enabled zone
+$ORIGIN 0.0.0.4.6.6.3.0.0.3.d.f.ip6.arpa.
+$TTL 3600
+
+; SOA record
+@       IN      SOA     ns1.scarjit.dn42. ferdinand.linnenberg.dev. (
+                        2025102101      ; Serial (YYYYMMDDNN)
+                        7200            ; Refresh
+                        3600            ; Retry
+                        1209600         ; Expire
+                        3600 )          ; Negative Cache TTL
+
+; NS records
+@       IN      NS      ns1.scarjit.dn42.
+@       IN      NS      ns1.linnenberg.dn42.
+
+; DNSKEY records (ZSK and KSK)
+@       IN      DNSKEY  256 3 13 w0lvHB6+SApaWaQGFws4drZWukmNpMd9fVuvMmjWPjDXpku154fi4HxdMAS/x9nYh1z3Om3nPKVM3zcz/8sL3A==
+@       IN      DNSKEY  257 3 13 ltYP9gTzVgweVR6sfqxRx3MveHqPgZ1dsltFvNQfFMLNskNYsvvX8yu/vscYbMlN5eydlXGRngVMNhM+FC1Seg==
+
+; PTR records for IPv6 addresses
+; fd30:366:4000::1
+1.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.4.6.6.3.0 IN PTR ns1.scarjit.dn42.
+
+; fd30:366:4000::2
+2.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.4.6.6.3.0 IN PTR ns1.linnenberg.dn42.

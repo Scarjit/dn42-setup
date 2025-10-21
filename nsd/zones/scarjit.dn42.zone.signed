@@ -1,0 +1,74 @@
+; File written on Tue Oct 21 11:54:18 2025
+; dnssec-signzone version 9.20.13
+scarjit.dn42.		3600	IN SOA	ns1.scarjit.dn42. ferdinand.linnenberg.dev. (
+					2025102102 ; serial
+					7200       ; refresh (2 hours)
+					3600       ; retry (1 hour)
+					1209600    ; expire (2 weeks)
+					3600       ; minimum (1 hour)
+					)
+			3600	RRSIG	SOA 13 2 3600 (
+					20251120085418 20251021085418 24332 scarjit.dn42.
+					S7LDo/scbTIG5DtwAfs9b/s8f2ZWD9m9TcMU
+					r/DzyVwMvQP7ZuoYOJlc0IbQpVxfUqdVt57y
+					ZHSUUNir46fBbA== )
+			3600	NS	ns1.scarjit.dn42.
+			3600	RRSIG	NS 13 2 3600 (
+					20251120085418 20251021085418 24332 scarjit.dn42.
+					s5/gnjCpWd7x7s9ZvHwC3p3bPZZ6pI4JVbG3
+					c14f5PvM6T7en69J2YLrMmlsTMGqG/NhTqib
+					lrhScHVLyJ3fBA== )
+			3600	A	172.20.13.1
+			3600	RRSIG	A 13 2 3600 (
+					20251120085418 20251021085418 24332 scarjit.dn42.
+					PQxfPtBnVGIox/fS0MWRoacJgOyu5BvXvAMF
+					81GZVv0KuZsFtT6LQDsyVczBnlEvbNlyAbrI
+					RKy38Y1SiSVUuQ== )
+			3600	DNSKEY	256 3 13 (
+					iogdQxUMhtnTNAOw6cxEBJ6MPuxOVxiFKG4R
+					+rviYrYhe17iXANb/QLwTEUPWHtdJwTGM4n1
+					6e//GRjW/Ozs/Q==
+					) ; ZSK; alg = ECDSAP256SHA256 ; key id = 24332
+			3600	DNSKEY	257 3 13 (
+					uWfhQ8T2phQjTWGEu16QmCCudjHgbZOVSCvS
+					bvwmHH1Y9yR4muHi3rDqPDUOYtPcY3qmVt2q
+					WJBfqIMPadDStw==
+					) ; KSK; alg = ECDSAP256SHA256 ; key id = 17034
+			3600	RRSIG	DNSKEY 13 2 3600 (
+					20251120085418 20251021085418 24332 scarjit.dn42.
+					Npsp754+58QOaeV1NuIQa7Rr4/1/t9h2uJuL
+					viuIA36PeuWe1ZSQpV9aOlnz5G31u15Uk107
+					M1pHIGDLekCz1Q== )
+			3600	RRSIG	DNSKEY 13 2 3600 (
+					20251120085418 20251021085418 17034 scarjit.dn42.
+					DRDbrwoO24xLkQAzf+ZtxDCJtytemJJMN7YP
+					Vu9r8kQ2Mof1NrdUVWSCIEttRPa0CASvKf90
+					4PJ0zsVj0aTi4Q== )
+			0	NSEC3PARAM 1 0 0 040DA67432E021A7
+			0	RRSIG	NSEC3PARAM 13 2 0 (
+					20251120085418 20251021085418 24332 scarjit.dn42.
+					3gjFTvplgQQGQ6f5+AICXtNvWtNyjUxsEmoH
+					PCMvdIHmriw/l8EJ8Eh0oH0AwvziAvuJN6m3
+					07eaBF5W+kIiYA== )
+ns1.scarjit.dn42.	3600	IN A	172.20.13.1
+			3600	RRSIG	A 13 3 3600 (
+					20251120085418 20251021085418 24332 scarjit.dn42.
+					vCssFNnakBvS2Li5Hbh8mGyBhhmWxEANcvge
+					7GSyxOvt3ZAM5zaoamjo7kZfydaY52zgEeD9
+					7iL6koHfKHfLbQ== )
+72STHF406L64CBUP9JJSUUSBFLOU4LP4.scarjit.dn42. 3600 IN NSEC3 1 1 0 040DA67432E021A7 (
+					ACPGHJL1T99V0CS7L4SF2EN90OMJNMSM
+					A NS SOA RRSIG DNSKEY NSEC3PARAM )
+			3600	RRSIG	NSEC3 13 3 3600 (
+					20251120085418 20251021085418 24332 scarjit.dn42.
+					7GcXl4QtjCMp03dylG+3Lm+GPkbxfBMsyDzw
+					MCy0szfeyBVIm/LefHAv3IRJWbuvxl4eZvlm
+					4YLCD6+y9FIFSw== )
+ACPGHJL1T99V0CS7L4SF2EN90OMJNMSM.scarjit.dn42. 3600 IN NSEC3 1 1 0 040DA67432E021A7 (
+					72STHF406L64CBUP9JJSUUSBFLOU4LP4
+					A RRSIG )
+			3600	RRSIG	NSEC3 13 3 3600 (
+					20251120085418 20251021085418 24332 scarjit.dn42.
+					7Xs2uFFcxklkwTmERjPtDSzTl76SHdZEqALC
+					GfEQT93LB9w9qGBs1iVK8fmGCoaAdk096AF5
+					tzp4ExsyW6Lcsw== )

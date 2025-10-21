@@ -1,0 +1,25 @@
+; Reverse DNS zone for 172.20.13.0/27
+; RFC 2317 Classless delegation zone
+; DNSSEC-enabled zone
+$ORIGIN 0/27.13.20.172.in-addr.arpa.
+$TTL 3600
+
+; SOA record
+@       IN      SOA     ns1.scarjit.dn42. ferdinand.linnenberg.dev. (
+                        2025102102      ; Serial (YYYYMMDDNN)
+                        7200            ; Refresh
+                        3600            ; Retry
+                        1209600         ; Expire
+                        3600 )          ; Negative Cache TTL
+
+; NS records
+@       IN      NS      ns1.scarjit.dn42.
+@       IN      NS      ns1.linnenberg.dn42.
+
+; DNSKEY records (ZSK and KSK)
+@       IN      DNSKEY  256 3 13 6jq4rtiCoidpLD3dSXJVnsoPw4Lkn7PmbC5rK1TvdACz1lQWYlMh8xcM zJq2phK76I0KgnoykIPWO8B4W3SF6A==
+@       IN      DNSKEY  257 3 13 ZOU2uhaARhhbcOTKLbzzJ39OHDn2HRrHVCmiuf6N0yTh/Sq4OW2Mqaea Tr/JqUWHPy8osD3fMyrCNNIxCs8n0w==
+
+; PTR records for hosts in 172.20.13.0/27 range (0-31)
+1       IN      PTR     ns1.scarjit.dn42.
+2       IN      PTR     ns1.linnenberg.dn42.

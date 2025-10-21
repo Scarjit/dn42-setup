@@ -1,0 +1,74 @@
+; File written on Tue Oct 21 11:54:31 2025
+; dnssec-signzone version 9.20.13
+linnenberg.dn42.	3600	IN SOA	ns1.linnenberg.dn42. ferdinand.linnenberg.dev. (
+					2025102102 ; serial
+					7200       ; refresh (2 hours)
+					3600       ; retry (1 hour)
+					1209600    ; expire (2 weeks)
+					3600       ; minimum (1 hour)
+					)
+			3600	RRSIG	SOA 13 2 3600 (
+					20251120085431 20251021085431 45642 linnenberg.dn42.
+					aOJK6u5CjUgOacxLDYDNz9VHICTI0dVF8iBh
+					2aHbfKr5N1ZcxgRqPNBOfxMJhJF8YsEW+8LY
+					WIRnKsMrM0nwuw== )
+			3600	NS	ns1.linnenberg.dn42.
+			3600	RRSIG	NS 13 2 3600 (
+					20251120085431 20251021085431 45642 linnenberg.dn42.
+					y03pVqKMdYvFVEdIgUd83Gur8ozl2J4zoG4W
+					IAP49ihmcGI7agsPRKdeRHBkj7rzZBdmaZMU
+					7yX84/x6NK3SvQ== )
+			3600	A	172.20.13.2
+			3600	RRSIG	A 13 2 3600 (
+					20251120085431 20251021085431 45642 linnenberg.dn42.
+					EzeqK93w/ShwY80JC9TKWuB2Lmz9UWU8iikz
+					0pyuF1aEyHLS7XD14i34tPHFp1cykh2HzdPU
+					6bxjPf1SEKvYjw== )
+			3600	DNSKEY	256 3 13 (
+					kuPBjH+pKQm+UoIuS37iIVVB7I1xmweCC39f
+					iTwYLaUQTtCL5VR7xfSxh1rZAOcuaDBzxDkW
+					//6VnR8LkJTazg==
+					) ; ZSK; alg = ECDSAP256SHA256 ; key id = 45642
+			3600	DNSKEY	257 3 13 (
+					8sKcE/HDzVvuHoBg47AChNZ4OI6FhEoRndsI
+					5dw9jIv3TC+nWnr+Y5os2Ktej7ZdKtKh7t5r
+					P8Uxqa+e9gWefA==
+					) ; KSK; alg = ECDSAP256SHA256 ; key id = 64819
+			3600	RRSIG	DNSKEY 13 2 3600 (
+					20251120085431 20251021085431 45642 linnenberg.dn42.
+					3az4BH7CHCSt8Wxzua/FziOksJnrX6w40jIv
+					LcnkqDOJ9O1lQrd+h0dGJA6I1FDGLzwS2xgS
+					e38s20rWE16pQQ== )
+			3600	RRSIG	DNSKEY 13 2 3600 (
+					20251120085431 20251021085431 64819 linnenberg.dn42.
+					GS5w5ntkf7X5RBrLOtPFEIXaMenC6Kg8h1bE
+					rusuDAT4hrHKiTiEbcUkJbfDMz70RbEQ5QXF
+					2UUBMcnqr+MpUg== )
+			0	NSEC3PARAM 1 0 0 C4DBD3A762345013
+			0	RRSIG	NSEC3PARAM 13 2 0 (
+					20251120085431 20251021085431 45642 linnenberg.dn42.
+					Um8IRXqySZ67Jr4PUFeNnt++VuL/YT1iYn/f
+					qyKjb0Lii/AZcDp6ea9DBHaJz1UP9wB3ZFBd
+					dpRsZ8GZrIYWvg== )
+ns1.linnenberg.dn42.	3600	IN A	172.20.13.2
+			3600	RRSIG	A 13 3 3600 (
+					20251120085431 20251021085431 45642 linnenberg.dn42.
+					q785zt2e7dFHObM4zpGhZdsx14us5XmLJEmY
+					wz6lOGM3H6ZUiEldGTc4m3/z0dWXPLGTuzJi
+					QeT9CemiOE4YFg== )
+RPR3HGBO9SRRK876UHJ73JG27FMVEG8S.linnenberg.dn42. 3600 IN NSEC3	1 1 0 C4DBD3A762345013 (
+					V8DL3NV8RFBS5H89E2MOPLEQMBV6PF04
+					A NS SOA RRSIG DNSKEY NSEC3PARAM )
+			3600	RRSIG	NSEC3 13 3 3600 (
+					20251120085431 20251021085431 45642 linnenberg.dn42.
+					FQIkJxMQpGWh/Z1dfFRUz4oMqTxEJVakKXWa
+					QuY1utfaygbnI0K/Wif2lQbVk7ZLs+fmxuFl
+					iAfOxpQpCeMrHg== )
+V8DL3NV8RFBS5H89E2MOPLEQMBV6PF04.linnenberg.dn42. 3600 IN NSEC3	1 1 0 C4DBD3A762345013 (
+					RPR3HGBO9SRRK876UHJ73JG27FMVEG8S
+					A RRSIG )
+			3600	RRSIG	NSEC3 13 3 3600 (
+					20251120085431 20251021085431 45642 linnenberg.dn42.
+					d+lcZiEyUf0YrOrdNuLmt9Q3YL4LHbFizqef
+					EHGuPHxU+XFxwj1p1jBjKk3kCrFeNWY7RDrK
+					hd4/5nOJA01wKw== )

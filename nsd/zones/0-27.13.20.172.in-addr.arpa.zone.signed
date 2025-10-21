@@ -1,0 +1,71 @@
+; File written on Tue Oct 21 11:12:18 2025
+; dnssec-signzone version 9.20.11-1ubuntu2-Ubuntu
+0/27.13.20.172.in-addr.arpa. 3600 IN SOA ns1.scarjit.dn42. ferdinand.linnenberg.dev. (
+					2025102102 ; serial
+					7200       ; refresh (2 hours)
+					3600       ; retry (1 hour)
+					1209600    ; expire (2 weeks)
+					3600       ; minimum (1 hour)
+					)
+			3600	RRSIG	SOA 13 6 3600 (
+					20251120101218 20251021101218 56625 0/27.13.20.172.in-addr.arpa.
+					A6oD6WBlMCRxWU2EHMicg+hx7wZJ/42e9rbl
+					8wp1TbZHxzXeS7ctJYOzDcFCJ/4lVP2//Y6K
+					U++qPrombFlCzg== )
+			3600	NS	ns1.scarjit.dn42.
+			3600	NS	ns1.linnenberg.dn42.
+			3600	RRSIG	NS 13 6 3600 (
+					20251120101218 20251021101218 56625 0/27.13.20.172.in-addr.arpa.
+					37DWsyO/q8BjyOMaaEox+P0glwkyvosYT1kR
+					pRP8Ubb/jxJgOa4XjqjoNKWm5kM7HbHfilwd
+					8XYqo/Tqx/iMfA== )
+			3600	NSEC	1.0/27.13.20.172.in-addr.arpa. NS SOA RRSIG NSEC DNSKEY
+			3600	RRSIG	NSEC 13 6 3600 (
+					20251120101218 20251021101218 56625 0/27.13.20.172.in-addr.arpa.
+					oA5dyw5MJXuhubFznGIZZlcSuibV3NqK3+uD
+					4RV3xrERHGnR/ucUSX+XB6SZ3iRm0cFtsbYK
+					hu45eYiShyTKEg== )
+			3600	DNSKEY	256 3 13 (
+					6jq4rtiCoidpLD3dSXJVnsoPw4Lkn7PmbC5r
+					K1TvdACz1lQWYlMh8xcMzJq2phK76I0Kgnoy
+					kIPWO8B4W3SF6A==
+					) ; ZSK; alg = ECDSAP256SHA256 ; key id = 56625
+			3600	DNSKEY	257 3 13 (
+					ZOU2uhaARhhbcOTKLbzzJ39OHDn2HRrHVCmi
+					uf6N0yTh/Sq4OW2MqaeaTr/JqUWHPy8osD3f
+					MyrCNNIxCs8n0w==
+					) ; KSK; alg = ECDSAP256SHA256 ; key id = 19121
+			3600	RRSIG	DNSKEY 13 6 3600 (
+					20251120101218 20251021101218 19121 0/27.13.20.172.in-addr.arpa.
+					aFaN/3xy+s057cfXynickeNg4zcCqJ1pJozr
+					nKuy7peFG5TCq8BW9mKWDftRMqNMPVcb1tmF
+					YENwvrfnCwSb4w== )
+			3600	RRSIG	DNSKEY 13 6 3600 (
+					20251120101218 20251021101218 56625 0/27.13.20.172.in-addr.arpa.
+					Zt27tXursr+nbeDYlKIPAQAqxWcb/ElpxF5L
+					KyStKrT4NogEbZQBVs83G40JzeAEFGtMHrgq
+					nh1zS8Qrscf+XQ== )
+1.0/27.13.20.172.in-addr.arpa. 3600 IN PTR ns1.scarjit.dn42.
+			3600	RRSIG	PTR 13 7 3600 (
+					20251120101218 20251021101218 56625 0/27.13.20.172.in-addr.arpa.
+					zcWypbLdYbi64PjqWM+IhAdKUGZPULjFiwl5
+					1ofep6Oamq/aDSUJ3h6HMCQwbDlraVkyi+77
+					zS2lqIRHbubG1Q== )
+			3600	NSEC	2.0/27.13.20.172.in-addr.arpa. PTR RRSIG NSEC
+			3600	RRSIG	NSEC 13 7 3600 (
+					20251120101218 20251021101218 56625 0/27.13.20.172.in-addr.arpa.
+					092eaCK25Sx2XN0nfdCDDbvry15xZmw0wTyC
+					v/G5b3Qw3l+8ZfTQbLVIQ4s8jDvwUZInumdE
+					kqYZaQn7xM39Vw== )
+2.0/27.13.20.172.in-addr.arpa. 3600 IN PTR ns1.linnenberg.dn42.
+			3600	RRSIG	PTR 13 7 3600 (
+					20251120101218 20251021101218 56625 0/27.13.20.172.in-addr.arpa.
+					dCbPC9EE4/IQKKr2ndO/vxSB/VRzdtPH3ctt
+					mTBG3aNFPbqRjKrjQSrHrQFSL68FClm0l7Du
+					4As8mLFRXTn3/g== )
+			3600	NSEC	0/27.13.20.172.in-addr.arpa. PTR RRSIG NSEC
+			3600	RRSIG	NSEC 13 7 3600 (
+					20251120101218 20251021101218 56625 0/27.13.20.172.in-addr.arpa.
+					h9z7zAqN1HAtEFl8HB6luSYFfe7kZoMyOEHm
+					QtxmpV7/LSKwSSzoUkd7S6pNocatNg7el56g
+					6b0JhLSkqDpLHA== )
