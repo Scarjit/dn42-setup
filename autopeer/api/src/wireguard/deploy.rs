@@ -67,7 +67,7 @@ impl WgKeypair {
 }
 
 /// Deploy a WireGuard configuration
-pub fn deploy_config<P: AsRef<Path>>(config_content: &str, interface_name: &str) -> Result<(), String> {
+pub fn deploy_config(config_content: &str, interface_name: &str) -> Result<(), String> {
     let config_path = PathBuf::from("/etc/wireguard").join(format!("{}.conf", interface_name));
 
     // Write config to /etc/wireguard/

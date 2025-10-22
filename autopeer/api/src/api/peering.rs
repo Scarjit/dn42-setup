@@ -1,0 +1,399 @@
+use crate::bird;
+use crate::challenge::{gpg::verify_signature, Challenge};
+use crate::config::AppConfig;
+use crate::ipalloc::{interface_name, wireguard_port, Ipv6LinkLocal};
+use crate::jwt::generate_token;
+use crate::middleware::JwtAuth;
+use crate::registry::{get_pgp_fingerprint_for_asn, verify_key_fingerprint};
+use crate::validation;
+use crate::wireguard::{self, BgpConfig, ChallengeConfig, InterfaceConfig, PeerConfig, WgConfig, WgKeypair};
+use axum::{
+    extract::{Path, State},
+    http::StatusCode,
+    Json,
+};
+use serde::{Deserialize, Serialize};
+use std::sync::Arc;
+use tracing::{error, info, warn};
+
+/// Request to initialize a new peering
+#[derive(Debug, Deserialize, Serialize)]
+pub struct InitRequest {
+    /// The peer's ASN
+    pub asn: u32,
+}
+
+/// Response from peering initialization
+#[derive(Debug, Deserialize, Serialize)]
+pub struct InitResponse {
+    /// The challenge code to sign
+    pub challenge: String,
+    /// The peer's WireGuard public key
+    pub peer_public_key: String,
+    /// The skeleton WireGuard config for the peer
+    pub wireguard_config: String,
+}
+
+/// POST /peering/init - Initialize a new peering
+pub async fn init_peering(
+    State(_config): State<Arc<AppConfig>>,
+    Json(req): Json<InitRequest>,
+) -> Result<Json<InitResponse>, (StatusCode, String)> {
+    info!("Peering init request for ASN {}", req.asn);
+
+    // Validate ASN
+    validation::validate_asn(req.asn)?;
+
+    // Generate challenge
+    let challenge = Challenge::generate(req.asn);
+
+    // Generate WireGuard keypair for this peer
+    let keypair = WgKeypair::generate()
+        .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, format!("Failed to generate keypair: {}", e)))?;
+
+    // Get my ASN from environment or config (for now, hardcode or add to AppConfig)
+    let my_asn: u32 = std::env::var("MY_ASN")
+        .ok()
+        .and_then(|s| s.parse().ok())
+        .unwrap_or(4242420257); // Default ASN
+
+    // Allocate IPs
+    let ips = Ipv6LinkLocal::from_asns(my_asn, req.asn);
+
+    // Create skeleton WireGuard config with Challenge section
+    let wg_config = WgConfig {
+        interface: InterfaceConfig {
+            address: vec![ips.peer.clone()],
+            private_key: keypair.private_key.clone(),
+            listen_port: wireguard_port(req.asn),
+            table: Some("off".to_string()),
+        },
+        peer: None, // Will be filled in after verification
+        challenge: Some(ChallengeConfig {
+            code: challenge.code.clone(),
+            asn: req.asn,
+        }),
+        bgp: None, // Will be filled in after verification
+    };
+
+    // Generate config string
+    let config_str = wg_config
+        .as_string()
+        .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, format!("Failed to generate config: {}", e)))?;
+
+    // Store the config somewhere (filesystem for now)
+    let iface_name = interface_name(req.asn);
+    let config_path = format!("./data/pending/{}.conf", iface_name);
+
+    // Ensure pending directory exists
+    std::fs::create_dir_all("./data/pending")
+        .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, format!("Failed to create pending dir: {}", e)))?;
+
+    wg_config
+        .to_file(&config_path)
+        .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, format!("Failed to save config: {}", e)))?;
+
+    Ok(Json(InitResponse {
+        challenge: challenge.code,
+        peer_public_key: keypair.public_key,
+        wireguard_config: config_str,
+    }))
+}
+
+/// Request to verify a peering
+#[derive(Debug, Deserialize, Serialize)]
+pub struct VerifyRequest {
+    /// The peer's ASN
+    pub asn: u32,
+    /// The signed challenge (cleartext signed message)
+    pub signed_challenge: String,
+    /// The peer's PGP public key
+    pub public_key: String,
+    /// The peer's WireGuard public key (for the complete config)
+    pub wg_public_key: String,
+    /// The peer's public endpoint (IP:port)
+    pub endpoint: String,
+}
+
+/// Response from peering verification
+#[derive(Debug, Deserialize, Serialize)]
+pub struct VerifyResponse {
+    /// JWT token for authenticated operations
+    pub token: String,
+    /// The complete WireGuard config with peer and BGP sections
+    pub wireguard_config: String,
+}
+
+/// POST /peering/verify - Verify a signed challenge and issue JWT
+pub async fn verify_peering(
+    State(config): State<Arc<AppConfig>>,
+    Json(req): Json<VerifyRequest>,
+) -> Result<Json<VerifyResponse>, (StatusCode, String)> {
+    info!("Peering verify request for ASN {}", req.asn);
+
+    // Validate inputs
+    validation::validate_asn(req.asn)?;
+    validation::validate_wg_pubkey(&req.wg_public_key)?;
+    validation::validate_endpoint(&req.endpoint)?;
+    validation::validate_pgp_key(&req.public_key)?;
+    validation::validate_signed_challenge(&req.signed_challenge)?;
+
+    // Load pending config
+    let iface_name = interface_name(req.asn);
+    let config_path = format!("./data/pending/{}.conf", iface_name);
+
+    let mut wg_config = WgConfig::from_file(&config_path)
+        .map_err(|e| (StatusCode::NOT_FOUND, format!("Pending config not found: {}", e)))?;
+
+    // Get challenge from config
+    let challenge_config = wg_config
+        .challenge
+        .as_ref()
+        .ok_or((StatusCode::BAD_REQUEST, "No challenge found in config".to_string()))?;
+
+    // Verify ASN matches
+    if challenge_config.asn != req.asn {
+        return Err((StatusCode::BAD_REQUEST, "ASN mismatch".to_string()));
+    }
+
+    // Verify GPG signature
+    let signature_valid = verify_signature(&challenge_config.code, &req.signed_challenge, &req.public_key)
+        .map_err(|e| {
+            warn!("Signature verification failed for ASN {}: {}", req.asn, e);
+            (StatusCode::UNAUTHORIZED, format!("Signature verification failed: {}", e))
+        })?;
+
+    if !signature_valid {
+        warn!("Invalid signature for ASN {}", req.asn);
+        return Err((StatusCode::UNAUTHORIZED, "Invalid signature".to_string()));
+    }
+
+    // Verify public key matches DN42 registry
+    let registry_path = &config.registry.path;
+    let expected_fingerprint = get_pgp_fingerprint_for_asn(registry_path, req.asn)
+        .map_err(|e| {
+            error!("Failed to get registry fingerprint for ASN {}: {}", req.asn, e);
+            (StatusCode::INTERNAL_SERVER_ERROR, format!("Failed to get registry fingerprint: {}", e))
+        })?;
+
+    verify_key_fingerprint(&req.public_key, &expected_fingerprint)
+        .map_err(|e| {
+            warn!("Key verification failed for ASN {}: {}", req.asn, e);
+            (StatusCode::UNAUTHORIZED, format!("Key verification failed: {}", e))
+        })?;
+
+    info!("Successfully verified ASN {}, issuing JWT token", req.asn);
+
+    // Generate JWT token
+    let token = generate_token(req.asn, &config.jwt_secret)
+        .map_err(|e| {
+            error!("Failed to generate token for ASN {}: {}", req.asn, e);
+            (StatusCode::INTERNAL_SERVER_ERROR, format!("Failed to generate token: {}", e))
+        })?;
+
+    // Get my ASN
+    let my_asn: u32 = std::env::var("MY_ASN")
+        .ok()
+        .and_then(|s| s.parse().ok())
+        .unwrap_or(4242420257);
+
+    // Complete the WireGuard config
+    let ips = Ipv6LinkLocal::from_asns(my_asn, req.asn);
+
+    // Add peer section with endpoint from verify request
+    wg_config.peer = Some(PeerConfig {
+        public_key: req.wg_public_key.clone(),
+        endpoint: Some(req.endpoint),
+        allowed_ips: vec!["0.0.0.0/0".to_string(), "::/0".to_string()],
+        persistent_keepalive: Some(25),
+    });
+
+    // Add BGP section
+    wg_config.bgp = Some(BgpConfig {
+        mpbgp: true,
+        extended_next_hop: true,
+        local: ips.local_addr(),
+        neighbor: ips.peer.clone(),
+    });
+
+    // Remove challenge section (no longer needed)
+    wg_config.challenge = None;
+
+    // Generate complete config
+    let complete_config = wg_config
+        .as_string()
+        .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, format!("Failed to generate config: {}", e)))?;
+
+    // Move config from pending to verified
+    let verified_path = format!("./data/verified/{}.conf", iface_name);
+    std::fs::create_dir_all("./data/verified")
+        .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, format!("Failed to create verified dir: {}", e)))?;
+
+    wg_config
+        .to_file(&verified_path)
+        .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, format!("Failed to save verified config: {}", e)))?;
+
+    // Remove pending config
+    let _ = std::fs::remove_file(&config_path);
+
+    Ok(Json(VerifyResponse {
+        token,
+        wireguard_config: complete_config,
+    }))
+}
+
+/// Request to deploy a peering
+#[derive(Debug, Deserialize, Serialize)]
+pub struct DeployRequest {
+    /// The peer's ASN
+    pub asn: u32,
+    /// JWT token for authentication
+    pub token: String,
+}
+
+/// Response from peering deployment
+#[derive(Debug, Deserialize, Serialize)]
+pub struct DeployResponse {
+    /// Status message
+    pub status: String,
+    /// The deployed interface name
+    pub interface: String,
+}
+
+/// POST /peering/deploy - Deploy a verified peering configuration
+pub async fn deploy_peering(
+    State(config): State<Arc<AppConfig>>,
+    Json(req): Json<DeployRequest>,
+) -> Result<Json<DeployResponse>, (StatusCode, String)> {
+    info!("Peering deploy request for ASN {}", req.asn);
+
+    // Validate ASN
+    validation::validate_asn(req.asn)?;
+
+    // Verify JWT token
+    let _auth = JwtAuth::verify(&req.token, req.asn, &config)?;
+
+    // Load verified config
+    let iface_name = interface_name(req.asn);
+    let config_path = format!("./data/verified/{}.conf", iface_name);
+
+    let wg_config = WgConfig::from_file(&config_path)
+        .map_err(|e| (StatusCode::NOT_FOUND, format!("Verified config not found: {}", e)))?;
+
+    // Generate WireGuard config string
+    let wg_config_str = wg_config
+        .as_string()
+        .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, format!("Failed to generate WireGuard config: {}", e)))?;
+
+    // Deploy WireGuard configuration
+    info!("Deploying WireGuard config for ASN {} ({})", req.asn, iface_name);
+    wireguard::deploy::deploy_config(&wg_config_str, &iface_name)
+        .map_err(|e| {
+            error!("Failed to deploy WireGuard for ASN {}: {}", req.asn, e);
+            (StatusCode::INTERNAL_SERVER_ERROR, format!("Failed to deploy WireGuard: {}", e))
+        })?;
+
+    // Generate and deploy BIRD configuration if BGP config exists
+    if wg_config.bgp.is_some() {
+        info!("Deploying BIRD config for ASN {}", req.asn);
+        let my_asn: u32 = std::env::var("MY_ASN")
+            .ok()
+            .and_then(|s| s.parse().ok())
+            .unwrap_or(4242420257);
+
+        let bird_peer_config = bird::BirdPeerConfig::new(
+            my_asn,
+            req.asn,
+            format!("AS{}", req.asn),
+            iface_name.clone(),
+        );
+
+        let bird_config_str = bird_peer_config
+            .to_config()
+            .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, format!("Failed to generate BIRD config: {}", e)))?;
+
+        bird::deploy::deploy_config(&bird_config_str, req.asn)
+            .map_err(|e| {
+                error!("Failed to deploy BIRD config for ASN {}: {}", req.asn, e);
+                (StatusCode::INTERNAL_SERVER_ERROR, format!("Failed to deploy BIRD config: {}", e))
+            })?;
+    }
+
+    info!("Successfully deployed peering for ASN {}", req.asn);
+
+    Ok(Json(DeployResponse {
+        status: "deployed".to_string(),
+        interface: iface_name,
+    }))
+}
+
+/// Query parameters for config retrieval
+#[derive(Debug, Deserialize, Serialize)]
+pub struct ConfigQuery {
+    /// JWT token for authentication
+    pub token: String,
+}
+
+/// Response from config retrieval
+#[derive(Debug, Deserialize, Serialize)]
+pub struct ConfigResponse {
+    /// The WireGuard configuration
+    pub wireguard_config: String,
+}
+
+/// GET /peering/config/:asn - Retrieve verified peering configuration
+pub async fn get_config(
+    State(config): State<Arc<AppConfig>>,
+    Path(asn): Path<u32>,
+    axum::extract::Query(query): axum::extract::Query<ConfigQuery>,
+) -> Result<Json<ConfigResponse>, (StatusCode, String)> {
+    info!("Config retrieval request for ASN {}", asn);
+
+    // Validate ASN
+    validation::validate_asn(asn)?;
+
+    // Verify JWT token
+    let _auth = JwtAuth::verify(&query.token, asn, &config)?;
+
+    // Load verified config
+    let iface_name = interface_name(asn);
+    let config_path = format!("./data/verified/{}.conf", iface_name);
+
+    let wg_config = WgConfig::from_file(&config_path)
+        .map_err(|e| (StatusCode::NOT_FOUND, format!("Config not found: {}", e)))?;
+
+    // Generate config string
+    let config_str = wg_config
+        .as_string()
+        .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, format!("Failed to generate config: {}", e)))?;
+
+    Ok(Json(ConfigResponse {
+        wireguard_config: config_str,
+    }))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_init_request_deserialization() {
+        let json = r#"{"asn": 4242420257}"#;
+        let req: InitRequest = serde_json::from_str(json).unwrap();
+
+        assert_eq!(req.asn, 4242420257);
+    }
+
+    #[test]
+    fn test_init_response_serialization() {
+        let resp = InitResponse {
+            challenge: "AUTOPEER-4242420257-abc123".to_string(),
+            peer_public_key: "testpubkey123==".to_string(),
+            wireguard_config: "[Interface]\nPrivateKey=test".to_string(),
+        };
+
+        let json = serde_json::to_string(&resp).unwrap();
+        assert!(json.contains("AUTOPEER-4242420257-abc123"));
+        assert!(json.contains("testpubkey123=="));
+    }
+}

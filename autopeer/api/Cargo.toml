@@ -16,5 +16,8 @@ git2 = "0.20"
 tera = "1.20"
 jsonwebtoken = { version = "10.1.0", default-features = false, features = ["rust_crypto"] }
 chrono = "0.4"
+regex = "1.11"
+tracing = "0.1"
+tracing-subscriber = { version = "0.3", features = ["env-filter"] }
 
 [dev-dependencies]

@@ -28,18 +28,10 @@ Flow: Generate skeleton config with `[Challenge]` → User authenticates with GP
 - [x] Generate WireGuard keypairs for each config
 - [x] Deploy WireGuard configuration (wg-quick up/down, write to /etc/wireguard/)
 - [x] Deploy BIRD configuration (write to /etc/bird/peers/, birdc configure)
-- [ ] Create API endpoints:
+- [x] Create API endpoints:
   - POST /peering/init (create skeleton config with challenge)
   - POST /peering/verify (submit signature, build full config)
   - POST /peering/deploy (deploy validated config)
-  - GET /peering/config/:id (retrieve their peer config)
-- [ ] Add input validation and sanitization
-- [ ] Add logging and error handling
-- [ ] Create config file for API settings (IP pools, config paths, etc)
-
-## Optional/Future
-
-- [ ] Rate limiting
-- [ ] Peer removal/deprovisioning endpoint
-- [ ] Admin API for manual overrides
-- [ ] Metrics and monitoring
+  - GET /peering/config/:asn (retrieve their peer config)
+- [x] Add input validation and sanitization
+- [x] Add logging and error handling

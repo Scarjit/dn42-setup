@@ -89,7 +89,7 @@ impl WgConfig {
     }
 
     /// Convert config to string representation using Tera template
-    fn as_string(&self) -> Result<String, String> {
+    pub fn as_string(&self) -> Result<String, String> {
         // Load template
         let mut tera = Tera::default();
         let template = include_str!("wg.conf.tera");

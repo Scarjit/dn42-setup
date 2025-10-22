@@ -1,6 +1,6 @@
 #![allow(dead_code)]
 
-mod gpg;
+pub mod gpg;
 
 use rand::Rng;
 use serde::{Deserialize, Serialize};
