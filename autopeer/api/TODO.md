@@ -24,9 +24,10 @@ Flow: Generate skeleton config with `[Challenge]` → User authenticates with GP
 - [x] Derive WireGuard port from ASN (port 3XXXX from AS424242XXXX)
 - [x] Allocate tunnel IP addresses (IPv6 link-local from ASN: fe80::{peer}:{my}:{0/1})
 - [x] Generate BIRD BGP peer configuration files
-- [ ] Implement JWT token generation and verification for authenticated ASNs
-- [ ] Deploy WireGuard configuration (wg-quick or systemd)
-- [ ] Reload BIRD configuration (birdc configure)
+- [x] Implement JWT token generation and verification for authenticated ASNs
+- [x] Generate WireGuard keypairs for each config
+- [x] Deploy WireGuard configuration (wg-quick up/down, write to /etc/wireguard/)
+- [x] Deploy BIRD configuration (write to /etc/bird/peers/, birdc configure)
 - [ ] Create API endpoints:
   - POST /peering/init (create skeleton config with challenge)
   - POST /peering/verify (submit signature, build full config)

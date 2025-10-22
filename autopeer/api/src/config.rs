@@ -5,6 +5,7 @@ use std::path::PathBuf;
 #[derive(Debug, Clone)]
 pub struct AppConfig {
     pub registry: RegistryConfig,
+    pub jwt_secret: String,
 }
 
 /// DN42 Registry configuration
@@ -19,8 +20,12 @@ pub struct RegistryConfig {
 impl AppConfig {
     /// Load configuration from environment variables
     pub fn from_env() -> Result<Self, String> {
+        let jwt_secret =
+            env::var("JWT_SECRET").map_err(|_| "JWT_SECRET not set".to_string())?;
+
         Ok(AppConfig {
             registry: RegistryConfig::from_env()?,
+            jwt_secret,
         })
     }
 }
@@ -78,5 +83,6 @@ mod tests {
 
         let config = AppConfig::from_env().unwrap();
         assert_eq!(config.registry.url, "https://git.dn42.dev/dn42/registry");
+        assert!(!config.jwt_secret.is_empty());
     }
 }

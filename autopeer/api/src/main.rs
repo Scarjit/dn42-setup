@@ -2,6 +2,7 @@ pub mod bird;
 pub mod challenge;
 pub mod config;
 pub mod ipalloc;
+pub mod jwt;
 pub mod registry;
 pub mod wireguard;
 
