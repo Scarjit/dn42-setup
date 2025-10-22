@@ -10,6 +10,7 @@ pub struct AppConfig {
     pub bind_address: String,
     pub data_pending_dir: String,
     pub data_verified_dir: String,
+    pub cookie_domains: Vec<String>,
 }
 
 /// DN42 Registry configuration
@@ -41,6 +42,12 @@ impl AppConfig {
         let data_verified_dir = env::var("DATA_VERIFIED_DIR")
             .unwrap_or_else(|_| "./data/verified".to_string());
 
+        let cookie_domains = env::var("COOKIE_DOMAINS")
+            .unwrap_or_else(|_| "localhost".to_string())
+            .split(',')
+            .map(|s| s.trim().to_string())
+            .collect();
+
         Ok(AppConfig {
             registry: RegistryConfig::from_env()?,
             jwt_secret,
@@ -48,6 +55,7 @@ impl AppConfig {
             bind_address,
             data_pending_dir,
             data_verified_dir,
+            cookie_domains,
         })
     }
 }

@@ -12,6 +12,7 @@ pub mod wireguard;
 
 use axum::{routing::{delete, get, patch, post}, Router};
 use std::sync::Arc;
+use tower_cookies::CookieManagerLayer;
 
 #[tokio::main]
 async fn main() {
@@ -41,6 +42,7 @@ async fn main() {
         .route("/peering/config", get(api::get_config))
         .route("/peering/update", patch(api::update_peering))
         .route("/peering", delete(api::delete_peering))
+        .layer(CookieManagerLayer::new())
         .with_state(app_config);
 
     let listener = tokio::net::TcpListener::bind(&bind_address)

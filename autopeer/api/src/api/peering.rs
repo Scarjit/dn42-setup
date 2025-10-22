@@ -2,7 +2,7 @@ use crate::bird;
 use crate::challenge::{gpg::verify_signature, Challenge};
 use crate::config::AppConfig;
 use crate::ipalloc::{interface_name, wireguard_port, Ipv6LinkLocal};
-use crate::jwt::{decode_token, generate_token};
+use crate::jwt::generate_token;
 use crate::middleware::JwtAuth;
 use crate::registry::{get_pgp_fingerprint_for_asn, verify_key_fingerprint};
 use crate::validation;
@@ -14,6 +14,7 @@ use axum::{
 };
 use serde::{Deserialize, Serialize};
 use std::sync::Arc;
+use tower_cookies::{Cookie, Cookies};
 use tracing::{error, info, warn};
 
 /// Request to initialize a new peering
@@ -121,6 +122,7 @@ pub struct VerifyResponse {
 /// POST /peering/verify - Verify a signed challenge and issue JWT
 pub async fn verify_peering(
     State(config): State<Arc<AppConfig>>,
+    cookies: Cookies,
     Json(req): Json<VerifyRequest>,
 ) -> Result<Json<VerifyResponse>, (StatusCode, String)> {
     info!("Peering verify request for ASN {}", req.asn);
@@ -224,6 +226,18 @@ pub async fn verify_peering(
     // Remove pending config
     let _ = std::fs::remove_file(&config_path);
 
+    // Set HTTP-only secure cookies for each domain
+    for domain in &config.cookie_domains {
+        let mut cookie = Cookie::new("autopeer_token", token.clone());
+        cookie.set_domain(domain.clone());
+        cookie.set_path("/");
+        cookie.set_http_only(true);
+        cookie.set_secure(true);
+        cookie.set_same_site(tower_cookies::cookie::SameSite::Strict);
+        cookie.set_max_age(tower_cookies::cookie::time::Duration::days(7));
+        cookies.add(cookie);
+    }
+
     Ok(Json(VerifyResponse {
         token,
         wireguard_config: complete_config,
@@ -235,8 +249,6 @@ pub async fn verify_peering(
 pub struct DeployRequest {
     /// The peer's ASN
     pub asn: u32,
-    /// JWT token for authentication
-    pub token: String,
 }
 
 /// Response from peering deployment
@@ -251,15 +263,16 @@ pub struct DeployResponse {
 /// POST /peering/deploy - Deploy a verified peering configuration
 pub async fn deploy_peering(
     State(config): State<Arc<AppConfig>>,
+    auth: JwtAuth,
     Json(req): Json<DeployRequest>,
 ) -> Result<Json<DeployResponse>, (StatusCode, String)> {
-    info!("Peering deploy request for ASN {}", req.asn);
+    let asn = auth.asn;
+    info!("Peering deploy request for ASN {}", asn);
 
-    // Validate ASN
-    validation::validate_asn(req.asn)?;
-
-    // Verify JWT token
-    let _auth = JwtAuth::verify(&req.token, req.asn, &config)?;
+    // Validate ASN matches request
+    if asn != req.asn {
+        return Err((StatusCode::BAD_REQUEST, "ASN mismatch between JWT and request".to_string()));
+    }
 
     // Load verified config
     let iface_name = interface_name(req.asn);
@@ -311,13 +324,6 @@ pub async fn deploy_peering(
     }))
 }
 
-/// Query parameters for config retrieval
-#[derive(Debug, Deserialize, Serialize)]
-pub struct ConfigQuery {
-    /// JWT token for authentication
-    pub token: String,
-}
-
 /// Response from config retrieval
 #[derive(Debug, Deserialize, Serialize)]
 pub struct ConfigResponse {
@@ -328,12 +334,9 @@ pub struct ConfigResponse {
 /// GET /peering/config - Retrieve verified peering configuration (ASN from JWT)
 pub async fn get_config(
     State(config): State<Arc<AppConfig>>,
-    axum::extract::Query(query): axum::extract::Query<ConfigQuery>,
+    auth: JwtAuth,
 ) -> Result<Json<ConfigResponse>, (StatusCode, String)> {
-    // Decode JWT to get ASN
-    let asn = decode_token(&query.token, &config.jwt_secret)
-        .map_err(|e| (StatusCode::UNAUTHORIZED, format!("Token decode failed: {}", e)))?;
-
+    let asn = auth.asn;
     info!("Config retrieval request for ASN {}", asn);
 
     // Load verified config
@@ -356,8 +359,6 @@ pub async fn get_config(
 /// Request to update a peering configuration
 #[derive(Debug, Deserialize, Serialize)]
 pub struct UpdateRequest {
-    /// JWT token for authentication
-    pub token: String,
     /// New endpoint (optional)
     pub endpoint: Option<String>,
 }
@@ -372,12 +373,10 @@ pub struct UpdateResponse {
 /// PATCH /peering/update - Update and re-deploy peering configuration
 pub async fn update_peering(
     State(config): State<Arc<AppConfig>>,
+    auth: JwtAuth,
     Json(req): Json<UpdateRequest>,
 ) -> Result<Json<UpdateResponse>, (StatusCode, String)> {
-    // Decode JWT to get ASN
-    let asn = decode_token(&req.token, &config.jwt_secret)
-        .map_err(|e| (StatusCode::UNAUTHORIZED, format!("Token decode failed: {}", e)))?;
-
+    let asn = auth.asn;
     info!("Peering update request for ASN {}", asn);
 
     // Validate endpoint if provided
@@ -436,12 +435,9 @@ pub async fn update_peering(
 /// DELETE /peering - Delete peering configuration
 pub async fn delete_peering(
     State(config): State<Arc<AppConfig>>,
-    axum::extract::Query(query): axum::extract::Query<ConfigQuery>,
+    auth: JwtAuth,
 ) -> Result<Json<UpdateResponse>, (StatusCode, String)> {
-    // Decode JWT to get ASN
-    let asn = decode_token(&query.token, &config.jwt_secret)
-        .map_err(|e| (StatusCode::UNAUTHORIZED, format!("Token decode failed: {}", e)))?;
-
+    let asn = auth.asn;
     info!("Peering delete request for ASN {}", asn);
 
     let iface_name = interface_name(asn);
