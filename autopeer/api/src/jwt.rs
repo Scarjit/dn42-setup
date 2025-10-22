@@ -59,6 +59,19 @@ pub fn verify_token(token: &str, asn: u32, secret: &str) -> Result<(), String> {
     Ok(())
 }
 
+/// Decode a token and extract the ASN (without validating against a specific ASN)
+pub fn decode_token(token: &str, secret: &str) -> Result<u32, String> {
+    let claims = decode::<Claims>(
+        token,
+        &DecodingKey::from_secret(secret.as_bytes()),
+        &Validation::default(),
+    )
+    .map(|data| data.claims)
+    .map_err(|e| format!("Failed to decode token: {}", e))?;
+
+    Ok(claims.asn)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

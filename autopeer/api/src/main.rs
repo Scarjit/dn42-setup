@@ -38,7 +38,7 @@ async fn main() {
         .route("/peering/init", post(api::init_peering))
         .route("/peering/verify", post(api::verify_peering))
         .route("/peering/deploy", post(api::deploy_peering))
-        .route("/peering/config/:asn", get(api::get_config))
+        .route("/peering/config", get(api::get_config))
         .with_state(app_config);
 
     let listener = tokio::net::TcpListener::bind(&bind_address)

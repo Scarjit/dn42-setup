@@ -2,13 +2,13 @@ use crate::bird;
 use crate::challenge::{gpg::verify_signature, Challenge};
 use crate::config::AppConfig;
 use crate::ipalloc::{interface_name, wireguard_port, Ipv6LinkLocal};
-use crate::jwt::generate_token;
+use crate::jwt::{decode_token, generate_token};
 use crate::middleware::JwtAuth;
 use crate::registry::{get_pgp_fingerprint_for_asn, verify_key_fingerprint};
 use crate::validation;
 use crate::wireguard::{self, BgpConfig, ChallengeConfig, InterfaceConfig, PeerConfig, WgConfig, WgKeypair};
 use axum::{
-    extract::{Path, State},
+    extract::State,
     http::StatusCode,
     Json,
 };
@@ -325,19 +325,16 @@ pub struct ConfigResponse {
     pub wireguard_config: String,
 }
 
-/// GET /peering/config/:asn - Retrieve verified peering configuration
+/// GET /peering/config - Retrieve verified peering configuration (ASN from JWT)
 pub async fn get_config(
     State(config): State<Arc<AppConfig>>,
-    Path(asn): Path<u32>,
     axum::extract::Query(query): axum::extract::Query<ConfigQuery>,
 ) -> Result<Json<ConfigResponse>, (StatusCode, String)> {
+    // Decode JWT to get ASN
+    let asn = decode_token(&query.token, &config.jwt_secret)
+        .map_err(|e| (StatusCode::UNAUTHORIZED, format!("Token decode failed: {}", e)))?;
+
     info!("Config retrieval request for ASN {}", asn);
-
-    // Validate ASN
-    validation::validate_asn(asn)?;
-
-    // Verify JWT token
-    let _auth = JwtAuth::verify(&query.token, asn, &config)?;
 
     // Load verified config
     let iface_name = interface_name(asn);
