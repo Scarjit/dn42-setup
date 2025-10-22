@@ -353,6 +353,128 @@ pub async fn get_config(
     }))
 }
 
+/// Request to update a peering configuration
+#[derive(Debug, Deserialize, Serialize)]
+pub struct UpdateRequest {
+    /// JWT token for authentication
+    pub token: String,
+    /// New endpoint (optional)
+    pub endpoint: Option<String>,
+}
+
+/// Response from peering update
+#[derive(Debug, Deserialize, Serialize)]
+pub struct UpdateResponse {
+    /// Status message
+    pub status: String,
+}
+
+/// PATCH /peering/update - Update and re-deploy peering configuration
+pub async fn update_peering(
+    State(config): State<Arc<AppConfig>>,
+    Json(req): Json<UpdateRequest>,
+) -> Result<Json<UpdateResponse>, (StatusCode, String)> {
+    // Decode JWT to get ASN
+    let asn = decode_token(&req.token, &config.jwt_secret)
+        .map_err(|e| (StatusCode::UNAUTHORIZED, format!("Token decode failed: {}", e)))?;
+
+    info!("Peering update request for ASN {}", asn);
+
+    // Validate endpoint if provided
+    if let Some(ref endpoint) = req.endpoint {
+        validation::validate_endpoint(endpoint)?;
+    }
+
+    // Load verified config
+    let iface_name = interface_name(asn);
+    let config_path = format!("{}/{}.conf", config.data_verified_dir, iface_name);
+
+    let mut wg_config = WgConfig::from_file(&config_path)
+        .map_err(|e| (StatusCode::NOT_FOUND, format!("Config not found: {}", e)))?;
+
+    // Update endpoint if provided
+    if let Some(endpoint) = req.endpoint {
+        if let Some(ref mut peer) = wg_config.peer {
+            peer.endpoint = Some(endpoint);
+        } else {
+            return Err((StatusCode::BAD_REQUEST, "No peer configuration to update".to_string()));
+        }
+    }
+
+    // Save updated config
+    wg_config
+        .to_file(&config_path)
+        .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, format!("Failed to save config: {}", e)))?;
+
+    // Generate config string
+    let wg_config_str = wg_config
+        .as_string()
+        .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, format!("Failed to generate config: {}", e)))?;
+
+    // Re-deploy WireGuard
+    info!("Re-deploying WireGuard config for ASN {} ({})", asn, iface_name);
+
+    // First remove old config
+    if let Err(e) = wireguard::deploy::remove_config(&iface_name) {
+        warn!("Failed to remove old WireGuard config for ASN {}: {}", asn, e);
+    }
+
+    // Deploy new config
+    wireguard::deploy::deploy_config(&wg_config_str, &iface_name)
+        .map_err(|e| {
+            error!("Failed to re-deploy WireGuard for ASN {}: {}", asn, e);
+            (StatusCode::INTERNAL_SERVER_ERROR, format!("Failed to re-deploy WireGuard: {}", e))
+        })?;
+
+    info!("Successfully updated peering for ASN {}", asn);
+
+    Ok(Json(UpdateResponse {
+        status: "updated".to_string(),
+    }))
+}
+
+/// DELETE /peering - Delete peering configuration
+pub async fn delete_peering(
+    State(config): State<Arc<AppConfig>>,
+    axum::extract::Query(query): axum::extract::Query<ConfigQuery>,
+) -> Result<Json<UpdateResponse>, (StatusCode, String)> {
+    // Decode JWT to get ASN
+    let asn = decode_token(&query.token, &config.jwt_secret)
+        .map_err(|e| (StatusCode::UNAUTHORIZED, format!("Token decode failed: {}", e)))?;
+
+    info!("Peering delete request for ASN {}", asn);
+
+    let iface_name = interface_name(asn);
+
+    // Remove WireGuard config
+    wireguard::deploy::remove_config(&iface_name)
+        .map_err(|e| {
+            error!("Failed to remove WireGuard for ASN {}: {}", asn, e);
+            (StatusCode::INTERNAL_SERVER_ERROR, format!("Failed to remove WireGuard: {}", e))
+        })?;
+
+    // Remove BIRD config
+    bird::deploy::remove_config(asn)
+        .map_err(|e| {
+            error!("Failed to remove BIRD config for ASN {}: {}", asn, e);
+            (StatusCode::INTERNAL_SERVER_ERROR, format!("Failed to remove BIRD config: {}", e))
+        })?;
+
+    // Remove verified config file
+    let config_path = format!("{}/{}.conf", config.data_verified_dir, iface_name);
+    std::fs::remove_file(&config_path)
+        .map_err(|e| {
+            error!("Failed to remove config file for ASN {}: {}", asn, e);
+            (StatusCode::INTERNAL_SERVER_ERROR, format!("Failed to remove config file: {}", e))
+        })?;
+
+    info!("Successfully deleted peering for ASN {}", asn);
+
+    Ok(Json(UpdateResponse {
+        status: "deleted".to_string(),
+    }))
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

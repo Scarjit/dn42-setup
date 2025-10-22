@@ -10,7 +10,7 @@ pub mod templates;
 pub mod validation;
 pub mod wireguard;
 
-use axum::{routing::{get, post}, Router};
+use axum::{routing::{delete, get, patch, post}, Router};
 use std::sync::Arc;
 
 #[tokio::main]
@@ -39,6 +39,8 @@ async fn main() {
         .route("/peering/verify", post(api::verify_peering))
         .route("/peering/deploy", post(api::deploy_peering))
         .route("/peering/config", get(api::get_config))
+        .route("/peering/update", patch(api::update_peering))
+        .route("/peering", delete(api::delete_peering))
         .with_state(app_config);
 
     let listener = tokio::net::TcpListener::bind(&bind_address)
