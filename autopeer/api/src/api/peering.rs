@@ -495,4 +495,123 @@ mod tests {
         assert!(json.contains("AUTOPEER-4242420257-abc123"));
         assert!(json.contains("testpubkey123=="));
     }
+
+    // Endpoint handler tests
+    mod handler_tests {
+        use super::*;
+        use crate::api::test_helpers::test_config_with_temp_dirs;
+        use axum::{body::Body, http::{Request, StatusCode}, Router, routing::post};
+        use tower::ServiceExt;
+
+        #[tokio::test]
+        async fn test_init_peering_success() {
+            let (config, _pending_dir, _verified_dir) = test_config_with_temp_dirs();
+            let test_asn = 4242421234;
+
+            let app = Router::new()
+                .route("/peering/init", post(init_peering))
+                .with_state(config.clone());
+
+            let request_body = serde_json::to_string(&InitRequest { asn: test_asn }).unwrap();
+            let request = Request::builder()
+                .method("POST")
+                .uri("/peering/init")
+                .header("content-type", "application/json")
+                .body(Body::from(request_body))
+                .unwrap();
+
+            let response = app.oneshot(request).await.unwrap();
+
+            assert_eq!(response.status(), StatusCode::OK);
+
+            let body = axum::body::to_bytes(response.into_body(), usize::MAX)
+                .await
+                .unwrap();
+            let init_response: InitResponse = serde_json::from_slice(&body).unwrap();
+
+            // Check challenge format
+            assert!(init_response.challenge.starts_with(&format!("AUTOPEER-{}-", test_asn)));
+
+            // Check that public key is present
+            assert!(!init_response.peer_public_key.is_empty());
+
+            // Check that WireGuard config is present
+            assert!(init_response.wireguard_config.contains("[Interface]"));
+
+            // Verify pending config was created
+            let iface_name = crate::ipalloc::interface_name(test_asn);
+            let config_path = std::path::PathBuf::from(&config.data_pending_dir)
+                .join(format!("{}.conf", iface_name));
+            assert!(config_path.exists(), "Pending config file should exist at {:?}", config_path);
+        }
+
+        #[tokio::test]
+        async fn test_init_peering_invalid_asn() {
+            let (config, _pending_dir, _verified_dir) = test_config_with_temp_dirs();
+
+            let app = Router::new()
+                .route("/peering/init", post(init_peering))
+                .with_state(config);
+
+            // Invalid ASN (too small for DN42)
+            let request_body = serde_json::to_string(&InitRequest { asn: 1000 }).unwrap();
+            let request = Request::builder()
+                .method("POST")
+                .uri("/peering/init")
+                .header("content-type", "application/json")
+                .body(Body::from(request_body))
+                .unwrap();
+
+            let response = app.oneshot(request).await.unwrap();
+
+            // Should fail with 400 Bad Request
+            assert_eq!(response.status(), StatusCode::BAD_REQUEST);
+        }
+
+
+        #[tokio::test]
+        async fn test_init_peering_creates_unique_challenges() {
+            let (config, _pending_dir, _verified_dir) = test_config_with_temp_dirs();
+            let test_asn = 4242421234;
+
+            // Create first peering
+            let app1 = Router::new()
+                .route("/peering/init", post(init_peering))
+                .with_state(config.clone());
+
+            let request_body = serde_json::to_string(&InitRequest { asn: test_asn }).unwrap();
+            let request1 = Request::builder()
+                .method("POST")
+                .uri("/peering/init")
+                .header("content-type", "application/json")
+                .body(Body::from(request_body.clone()))
+                .unwrap();
+
+            let response1 = app1.oneshot(request1).await.unwrap();
+            let body1 = axum::body::to_bytes(response1.into_body(), usize::MAX).await.unwrap();
+            let resp1: InitResponse = serde_json::from_slice(&body1).unwrap();
+
+            // Create second peering with same ASN
+            let app2 = Router::new()
+                .route("/peering/init", post(init_peering))
+                .with_state(config);
+
+            let request2 = Request::builder()
+                .method("POST")
+                .uri("/peering/init")
+                .header("content-type", "application/json")
+                .body(Body::from(request_body))
+                .unwrap();
+
+            let response2 = app2.oneshot(request2).await.unwrap();
+            let body2 = axum::body::to_bytes(response2.into_body(), usize::MAX).await.unwrap();
+            let resp2: InitResponse = serde_json::from_slice(&body2).unwrap();
+
+            // Challenges should be different (random)
+            assert_ne!(resp1.challenge, resp2.challenge);
+
+            // Public keys should also be different (random keypair generation)
+            assert_ne!(resp1.peer_public_key, resp2.peer_public_key);
+        }
+    }
 }
