@@ -30,14 +30,15 @@ This document tracks missing test coverage based on `cargo llvm-cov` analysis.
 
 ### 3. API Endpoint Handlers (`api/peering.rs` - 4.78% coverage)
 
-Currently only testing request/response struct serialization. Missing full handler logic:
+**Testing Strategy:** ✅ Test helpers created with temp directories to test endpoints without invoking wg-quick/birdc
 
-#### `init_peering()` - 0% handler coverage
-- [ ] Valid ASN validation
-- [ ] Challenge generation
-- [ ] Pending config creation
-- [ ] File I/O error handling
-- [ ] Response with challenge
+#### `init_peering()` - ✅ PARTIAL (3 tests)
+- [x] Valid ASN validation
+- [x] Challenge generation
+- [x] Pending config creation (verified in temp dir)
+- [x] Unique challenge generation
+- [x] Response with challenge
+- [ ] File I/O error handling (directory creation failures)
 
 #### `verify_peering()` - 0% handler coverage
 - [ ] GPG signature verification flow
@@ -253,12 +254,18 @@ Currently only testing request/response struct serialization. Missing full handl
 - [x] Test GPG key created (`tests/fixtures/gpg/`)
 - [x] Test key private part encrypted with git-crypt
 - [x] Test key removed from user keyring
+- [x] Test helpers module (`src/api/test_helpers.rs`)
+- [x] Temporary test directory helpers (using tempfile)
+- [x] Test config fixtures with temp dirs
+
+**Strategy for System Commands:**
+- ✅ **Skip actual deployment** - Test everything up to wg-quick/birdc calls
+- ✅ **Verify config files** - Check files are created in temp directories
+- ✅ **No root required** - Tests run safely on developer machines
 
 **Needed:**
-- [ ] Mock HTTP client for API tests
-- [ ] Temporary test directory helpers
-- [ ] Test database/config fixtures
-- [ ] Mock system command execution (for WireGuard/BIRD without root)
+- [ ] Mock HTTP client for full integration tests (optional)
+- [ ] Mock system command execution for deployment tests (optional)
 - [ ] CI/CD integration test environment
 
 ---
@@ -266,11 +273,11 @@ Currently only testing request/response struct serialization. Missing full handl
 ## Summary by Priority
 
 ### Must Have (Critical/High):
-1. ✅ Main.rs integration tests (server startup, routing)
-2. ✅ Middleware tests (JWT auth extractor)
-3. ✅ API endpoint handler tests (all 6 endpoints)
-4. ✅ WireGuard deployment tests
-5. ✅ BIRD deployment tests
+1. ⚠️ Main.rs integration tests (server startup, routing) - **SKIPPED**
+2. ✅ Middleware tests (JWT auth extractor) - **COMPLETE** (99.21% coverage)
+3. ⏳ API endpoint handler tests (all 6 endpoints) - **IN PROGRESS** (init_peering done)
+4. ⏳ WireGuard deployment tests - **DEFERRED** (skipping actual wg-quick calls)
+5. ⏳ BIRD deployment tests - **DEFERRED** (skipping actual birdc calls)
 
 ### Should Have (Medium):
 6. Templates error handling
@@ -303,6 +310,7 @@ Currently only testing request/response struct serialization. Missing full handl
 
 ---
 
-**Last Updated:** 2025-10-22
+**Last Updated:** 2025-10-22 (17:00)
 **Coverage Tool:** `cargo llvm-cov`
-**Current Coverage:** 62.65% lines, 59.71% regions
+**Current Coverage:** 67.92% lines, 66.14% regions
+**Total Tests:** 52 (up from 41 initial)
