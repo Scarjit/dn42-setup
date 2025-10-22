@@ -126,6 +126,7 @@ dependencies = [
  "serde_json",
  "tera",
  "tokio",
+ "tower",
  "tower-cookies",
  "tracing",
  "tracing-subscriber",
