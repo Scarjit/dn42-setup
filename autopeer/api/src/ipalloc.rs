@@ -1,5 +1,3 @@
-#![allow(dead_code)]
-
 /// Derive IPv6 link-local addresses from ASNs
 /// Format: fe80::{peer_asn}:{my_asn}:{0/1}/64
 pub struct Ipv6LinkLocal {

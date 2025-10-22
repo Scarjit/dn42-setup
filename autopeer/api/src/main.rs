@@ -6,6 +6,7 @@ pub mod ipalloc;
 pub mod jwt;
 pub mod middleware;
 pub mod registry;
+pub mod templates;
 pub mod validation;
 pub mod wireguard;
 
@@ -30,6 +31,8 @@ async fn main() {
         config::AppConfig::from_env().expect("Failed to load configuration")
     );
 
+    let bind_address = app_config.bind_address.clone();
+
     let app = Router::new()
         .route("/", get(root))
         .route("/peering/init", post(api::init_peering))
@@ -38,15 +41,15 @@ async fn main() {
         .route("/peering/config/:asn", get(api::get_config))
         .with_state(app_config);
 
-    let listener = tokio::net::TcpListener::bind("127.0.0.1:3000")
+    let listener = tokio::net::TcpListener::bind(&bind_address)
         .await
-        .unwrap();
+        .expect(&format!("Failed to bind to {}", bind_address));
 
-    println!(
-        "AutoPeer API listening on {}",
-        listener.local_addr().unwrap()
-    );
-    axum::serve(listener, app).await.unwrap();
+    println!("AutoPeer API listening on {}", bind_address);
+
+    if let Err(e) = axum::serve(listener, app).await {
+        eprintln!("Server error: {}", e);
+    }
 }
 
 async fn root() -> &'static str {

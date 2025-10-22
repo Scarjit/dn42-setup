@@ -6,6 +6,10 @@ use std::path::PathBuf;
 pub struct AppConfig {
     pub registry: RegistryConfig,
     pub jwt_secret: String,
+    pub my_asn: u32,
+    pub bind_address: String,
+    pub data_pending_dir: String,
+    pub data_verified_dir: String,
 }
 
 /// DN42 Registry configuration
@@ -23,9 +27,27 @@ impl AppConfig {
         let jwt_secret =
             env::var("JWT_SECRET").map_err(|_| "JWT_SECRET not set".to_string())?;
 
+        let my_asn = env::var("MY_ASN")
+            .ok()
+            .and_then(|s| s.parse().ok())
+            .unwrap_or(4242420257);
+
+        let bind_address = env::var("BIND_ADDRESS")
+            .unwrap_or_else(|_| "127.0.0.1:3000".to_string());
+
+        let data_pending_dir = env::var("DATA_PENDING_DIR")
+            .unwrap_or_else(|_| "./data/pending".to_string());
+
+        let data_verified_dir = env::var("DATA_VERIFIED_DIR")
+            .unwrap_or_else(|_| "./data/verified".to_string());
+
         Ok(AppConfig {
             registry: RegistryConfig::from_env()?,
             jwt_secret,
+            my_asn,
+            bind_address,
+            data_pending_dir,
+            data_verified_dir,
         })
     }
 }

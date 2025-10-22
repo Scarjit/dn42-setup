@@ -36,7 +36,7 @@ pub struct InitResponse {
 
 /// POST /peering/init - Initialize a new peering
 pub async fn init_peering(
-    State(_config): State<Arc<AppConfig>>,
+    State(config): State<Arc<AppConfig>>,
     Json(req): Json<InitRequest>,
 ) -> Result<Json<InitResponse>, (StatusCode, String)> {
     info!("Peering init request for ASN {}", req.asn);
@@ -51,14 +51,8 @@ pub async fn init_peering(
     let keypair = WgKeypair::generate()
         .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, format!("Failed to generate keypair: {}", e)))?;
 
-    // Get my ASN from environment or config (for now, hardcode or add to AppConfig)
-    let my_asn: u32 = std::env::var("MY_ASN")
-        .ok()
-        .and_then(|s| s.parse().ok())
-        .unwrap_or(4242420257); // Default ASN
-
     // Allocate IPs
-    let ips = Ipv6LinkLocal::from_asns(my_asn, req.asn);
+    let ips = Ipv6LinkLocal::from_asns(config.my_asn, req.asn);
 
     // Create skeleton WireGuard config with Challenge section
     let wg_config = WgConfig {
@@ -83,10 +77,10 @@ pub async fn init_peering(
 
     // Store the config somewhere (filesystem for now)
     let iface_name = interface_name(req.asn);
-    let config_path = format!("./data/pending/{}.conf", iface_name);
+    let config_path = format!("{}/{}.conf", config.data_pending_dir, iface_name);
 
     // Ensure pending directory exists
-    std::fs::create_dir_all("./data/pending")
+    std::fs::create_dir_all(&config.data_pending_dir)
         .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, format!("Failed to create pending dir: {}", e)))?;
 
     wg_config
@@ -140,7 +134,7 @@ pub async fn verify_peering(
 
     // Load pending config
     let iface_name = interface_name(req.asn);
-    let config_path = format!("./data/pending/{}.conf", iface_name);
+    let config_path = format!("{}/{}.conf", config.data_pending_dir, iface_name);
 
     let mut wg_config = WgConfig::from_file(&config_path)
         .map_err(|e| (StatusCode::NOT_FOUND, format!("Pending config not found: {}", e)))?;
@@ -191,14 +185,8 @@ pub async fn verify_peering(
             (StatusCode::INTERNAL_SERVER_ERROR, format!("Failed to generate token: {}", e))
         })?;
 
-    // Get my ASN
-    let my_asn: u32 = std::env::var("MY_ASN")
-        .ok()
-        .and_then(|s| s.parse().ok())
-        .unwrap_or(4242420257);
-
     // Complete the WireGuard config
-    let ips = Ipv6LinkLocal::from_asns(my_asn, req.asn);
+    let ips = Ipv6LinkLocal::from_asns(config.my_asn, req.asn);
 
     // Add peer section with endpoint from verify request
     wg_config.peer = Some(PeerConfig {
@@ -225,8 +213,8 @@ pub async fn verify_peering(
         .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, format!("Failed to generate config: {}", e)))?;
 
     // Move config from pending to verified
-    let verified_path = format!("./data/verified/{}.conf", iface_name);
-    std::fs::create_dir_all("./data/verified")
+    let verified_path = format!("{}/{}.conf", config.data_verified_dir, iface_name);
+    std::fs::create_dir_all(&config.data_verified_dir)
         .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, format!("Failed to create verified dir: {}", e)))?;
 
     wg_config
@@ -275,7 +263,7 @@ pub async fn deploy_peering(
 
     // Load verified config
     let iface_name = interface_name(req.asn);
-    let config_path = format!("./data/verified/{}.conf", iface_name);
+    let config_path = format!("{}/{}.conf", config.data_verified_dir, iface_name);
 
     let wg_config = WgConfig::from_file(&config_path)
         .map_err(|e| (StatusCode::NOT_FOUND, format!("Verified config not found: {}", e)))?;
@@ -296,13 +284,9 @@ pub async fn deploy_peering(
     // Generate and deploy BIRD configuration if BGP config exists
     if wg_config.bgp.is_some() {
         info!("Deploying BIRD config for ASN {}", req.asn);
-        let my_asn: u32 = std::env::var("MY_ASN")
-            .ok()
-            .and_then(|s| s.parse().ok())
-            .unwrap_or(4242420257);
 
         let bird_peer_config = bird::BirdPeerConfig::new(
-            my_asn,
+            config.my_asn,
             req.asn,
             format!("AS{}", req.asn),
             iface_name.clone(),
@@ -357,7 +341,7 @@ pub async fn get_config(
 
     // Load verified config
     let iface_name = interface_name(asn);
-    let config_path = format!("./data/verified/{}.conf", iface_name);
+    let config_path = format!("{}/{}.conf", config.data_verified_dir, iface_name);
 
     let wg_config = WgConfig::from_file(&config_path)
         .map_err(|e| (StatusCode::NOT_FOUND, format!("Config not found: {}", e)))?;

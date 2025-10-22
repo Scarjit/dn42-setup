@@ -1,11 +1,9 @@
-#![allow(dead_code)]
-
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::fmt;
 use std::fs;
 use std::path::Path;
-use tera::{Context, Tera};
+use tera::Context;
 
 /// WireGuard interface configuration
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
@@ -90,12 +88,6 @@ impl WgConfig {
 
     /// Convert config to string representation using Tera template
     pub fn as_string(&self) -> Result<String, String> {
-        // Load template
-        let mut tera = Tera::default();
-        let template = include_str!("wg.conf.tera");
-        tera.add_raw_template("wg.conf", template)
-            .map_err(|e| format!("Failed to parse template: {}", e))?;
-
         // Create context
         let mut context = Context::new();
         context.insert("interface_address", &self.interface.address);
@@ -107,8 +99,8 @@ impl WgConfig {
         context.insert("bgp", &self.bgp);
 
         // Render template
-        tera.render("wg.conf", &context)
-            .map_err(|e| format!("Failed to render template: {}", e))
+        let template = include_str!("wg.conf.tera");
+        crate::templates::render_template("wg.conf", template, &context)
     }
 }
 

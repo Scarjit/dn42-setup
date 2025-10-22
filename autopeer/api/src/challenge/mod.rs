@@ -1,5 +1,3 @@
-#![allow(dead_code)]
-
 pub mod gpg;
 
 use rand::Rng;
@@ -20,13 +18,6 @@ impl Challenge {
         let code = format!("AUTOPEER-{}-{}", asn, hex::encode(random_bytes));
 
         Challenge { code, asn }
-    }
-
-    /// Verify a GPG signature for this challenge
-    /// Returns true if the signature is valid
-    /// Requires the public key in PGP format
-    pub fn verify_signature(&self, signature: &str, public_key: &str) -> Result<bool, String> {
-        gpg::verify_signature(&self.code, signature, public_key)
     }
 }
 
@@ -66,11 +57,4 @@ mod tests {
         assert_eq!(challenge, deserialized);
     }
 
-    #[test]
-    fn test_verify_signature_invalid() {
-        let challenge = Challenge::generate(4242421234);
-        let result = challenge.verify_signature("fake-signature", "invalid-key");
-
-        assert!(result.is_err());
-    }
 }

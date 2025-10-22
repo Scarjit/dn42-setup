@@ -1,5 +1,3 @@
-#![allow(dead_code)]
-
 mod config;
 pub mod deploy;
 

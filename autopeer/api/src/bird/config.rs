@@ -1,7 +1,7 @@
 use crate::ipalloc::Ipv6LinkLocal;
 use std::fs;
 use std::path::Path;
-use tera::{Context, Tera};
+use tera::Context;
 
 /// BIRD BGP peer configuration
 pub struct BirdPeerConfig {
@@ -28,12 +28,6 @@ impl BirdPeerConfig {
 
     /// Generate BIRD configuration as string using Tera template
     pub fn to_config(&self) -> Result<String, String> {
-        // Load template
-        let mut tera = Tera::default();
-        let template = include_str!("peer.conf.tera");
-        tera.add_raw_template("peer.conf", template)
-            .map_err(|e| format!("Failed to parse template: {}", e))?;
-
         // Create context
         let mut context = Context::new();
         context.insert("my_asn", &self.my_asn);
@@ -44,8 +38,8 @@ impl BirdPeerConfig {
         context.insert("peer_ip", &self.ips.peer);
 
         // Render template
-        tera.render("peer.conf", &context)
-            .map_err(|e| format!("Failed to render template: {}", e))
+        let template = include_str!("peer.conf.tera");
+        crate::templates::render_template("peer.conf", template, &context)
     }
 
     /// Write configuration to file

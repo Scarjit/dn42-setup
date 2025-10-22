@@ -1,5 +1,15 @@
 use axum::http::StatusCode;
+use once_cell::sync::Lazy;
 use regex::Regex;
+
+// Compile regexes once at startup
+static IPV4_PATTERN: Lazy<Regex> = Lazy::new(|| {
+    Regex::new(r"^(\d{1,3}\.){3}\d{1,3}:\d{1,5}$").unwrap()
+});
+
+static IPV6_PATTERN: Lazy<Regex> = Lazy::new(|| {
+    Regex::new(r"^\[([0-9a-fA-F:]+)\]:\d{1,5}$").unwrap()
+});
 
 /// Validate ASN is within DN42 range
 pub fn validate_asn(asn: u32) -> Result<(), (StatusCode, String)> {
@@ -14,25 +24,17 @@ pub fn validate_asn(asn: u32) -> Result<(), (StatusCode, String)> {
 
 /// Validate endpoint format (IP:port)
 pub fn validate_endpoint(endpoint: &str) -> Result<(), (StatusCode, String)> {
-    // Basic validation for IPv4:port or [IPv6]:port
-    let ipv4_pattern = Regex::new(r"^(\d{1,3}\.){3}\d{1,3}:\d{1,5}$").unwrap();
-    let ipv6_pattern = Regex::new(r"^\[([0-9a-fA-F:]+)\]:\d{1,5}$").unwrap();
-
-    if !ipv4_pattern.is_match(endpoint) && !ipv6_pattern.is_match(endpoint) {
+    if !IPV4_PATTERN.is_match(endpoint) && !IPV6_PATTERN.is_match(endpoint) {
         return Err((
             StatusCode::BAD_REQUEST,
             "Invalid endpoint format. Expected IP:port or [IPv6]:port".to_string(),
         ));
     }
 
-    // Validate port range
+    // Check port is not 0
     let port_str = endpoint.rsplit(':').next().unwrap();
-    if let Ok(port) = port_str.parse::<u16>() {
-        if port == 0 {
-            return Err((StatusCode::BAD_REQUEST, "Port cannot be 0".to_string()));
-        }
-    } else {
-        return Err((StatusCode::BAD_REQUEST, "Invalid port number".to_string()));
+    if port_str == "0" || port_str == "00000" {
+        return Err((StatusCode::BAD_REQUEST, "Port cannot be 0".to_string()));
     }
 
     Ok(())
@@ -58,41 +60,21 @@ pub fn validate_wg_pubkey(key: &str) -> Result<(), (StatusCode, String)> {
     Ok(())
 }
 
-/// Validate PGP public key format
+/// Validate PGP public key format (basic check - actual parsing happens later)
 pub fn validate_pgp_key(key: &str) -> Result<(), (StatusCode, String)> {
-    if !key.contains("-----BEGIN PGP PUBLIC KEY BLOCK-----") {
-        return Err((
-            StatusCode::BAD_REQUEST,
-            "Invalid PGP public key format".to_string(),
-        ));
+    if key.is_empty() {
+        return Err((StatusCode::BAD_REQUEST, "PGP key cannot be empty".to_string()));
     }
-
-    if !key.contains("-----END PGP PUBLIC KEY BLOCK-----") {
-        return Err((
-            StatusCode::BAD_REQUEST,
-            "Invalid PGP public key format".to_string(),
-        ));
-    }
-
+    // Real validation happens in verify_key_fingerprint
     Ok(())
 }
 
-/// Validate signed challenge format
+/// Validate signed challenge format (basic check - actual parsing happens later)
 pub fn validate_signed_challenge(signed: &str) -> Result<(), (StatusCode, String)> {
-    if !signed.contains("-----BEGIN PGP SIGNED MESSAGE-----") {
-        return Err((
-            StatusCode::BAD_REQUEST,
-            "Invalid signed message format".to_string(),
-        ));
+    if signed.is_empty() {
+        return Err((StatusCode::BAD_REQUEST, "Signed message cannot be empty".to_string()));
     }
-
-    if !signed.contains("-----BEGIN PGP SIGNATURE-----") {
-        return Err((
-            StatusCode::BAD_REQUEST,
-            "Invalid signed message format".to_string(),
-        ));
-    }
-
+    // Real validation happens in gpg::verify_signature
     Ok(())
 }
 
