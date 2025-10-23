@@ -15,7 +15,7 @@ pub fn test_config_with_temp_dirs() -> (Arc<AppConfig>, tempfile::TempDir, tempf
     let config = Arc::new(AppConfig {
         registry: crate::config::RegistryConfig {
             url: "https://test.example".to_string(),
-            path: PathBuf::from("/tmp/test-registry"),
+            path: PathBuf::from("./data/dn42-registry"),
             username: "test".to_string(),
             token: "test".to_string(),
         },
