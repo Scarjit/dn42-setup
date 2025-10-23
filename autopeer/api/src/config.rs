@@ -11,6 +11,7 @@ pub struct AppConfig {
     pub data_pending_dir: String,
     pub data_verified_dir: String,
     pub cookie_domains: Vec<String>,
+    pub public_endpoint: String,
 }
 
 /// DN42 Registry configuration
@@ -48,6 +49,9 @@ impl AppConfig {
             .map(|s| s.trim().to_string())
             .collect();
 
+        let public_endpoint = env::var("PUBLIC_ENDPOINT")
+            .unwrap_or_else(|_| "dn42-router.linnenberg.dev".to_string());
+
         Ok(AppConfig {
             registry: RegistryConfig::from_env()?,
             jwt_secret,
@@ -56,6 +60,7 @@ impl AppConfig {
             data_pending_dir,
             data_verified_dir,
             cookie_domains,
+            public_endpoint,
         })
     }
 }

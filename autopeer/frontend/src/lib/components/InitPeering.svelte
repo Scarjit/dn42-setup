@@ -2,7 +2,8 @@
   import { createMutation } from '@tanstack/svelte-query';
   import { Copy, CheckCircle2, AlertCircle } from 'lucide-svelte';
   import { apiClient } from '$lib/api/client';
-  import type { InitResponse } from '$lib/api/types';
+  import type { InitResponse, DeploymentInfo } from '$lib/api/types';
+  import DeploymentForm from './DeploymentForm.svelte';
 
   // Load state from localStorage on mount
   let asn = $state(typeof window !== 'undefined' ? localStorage.getItem('autopeer_asn') || '' : '');
@@ -43,13 +44,20 @@
     }
   });
 
-  // Verification form state
+  // Verification form state (only GPG-related)
   let signedChallenge = $state('');
   let publicKey = $state('');
-  let wgPublicKey = $state('');
-  let endpoint = $state('');
 
-  // Validation helpers
+  // Login state
+  let isLoggedIn = $state(false);
+  let jwtToken = $state<string | null>(typeof window !== 'undefined' ? localStorage.getItem('autopeer_token') : null);
+
+  // Check if user is logged in on mount
+  $effect(() => {
+    isLoggedIn = !!jwtToken;
+  });
+
+  // Validation helpers for GPG
   function isValidSignedChallenge(value: string): boolean {
     return value.includes('-----BEGIN PGP SIGNED MESSAGE-----') &&
            value.includes('-----BEGIN PGP SIGNATURE-----') &&
@@ -59,19 +67,6 @@
   function isValidPublicKey(value: string): boolean {
     return value.includes('-----BEGIN PGP PUBLIC KEY BLOCK-----') &&
            value.includes('-----END PGP PUBLIC KEY BLOCK-----');
-  }
-
-  function isValidWgPublicKey(value: string): boolean {
-    // WireGuard public keys are 44 characters base64 (typically ending with =)
-    return /^[A-Za-z0-9+/]{42,44}={0,2}$/.test(value.trim());
-  }
-
-  function isValidEndpoint(value: string): boolean {
-    // IPv4:port, [IPv6]:port, or domain:port
-    const ipv4Pattern = /^(\d{1,3}\.){3}\d{1,3}:\d{1,5}$/;
-    const ipv6Pattern = /^\[([0-9a-fA-F:]+)\]:\d{1,5}$/;
-    const domainPattern = /^[a-zA-Z0-9.-]+:\d{1,5}$/;
-    return ipv4Pattern.test(value) || ipv6Pattern.test(value) || domainPattern.test(value);
   }
 
   const initMutation = createMutation(() => ({
@@ -90,9 +85,22 @@
         asn: parseInt(asn, 10),
         signed_challenge: signedChallenge,
         public_key: publicKey,
-        wg_public_key: wgPublicKey,
-        endpoint: endpoint,
       });
+    },
+    onSuccess: (data) => {
+      jwtToken = data.token;
+      isLoggedIn = true;
+
+      // Store token in localStorage
+      if (typeof window !== 'undefined') {
+        localStorage.setItem('autopeer_token', data.token);
+      }
+
+      // Clear verification form
+      signedChallenge = '';
+      publicKey = '';
+      challenge = null;
+      pgpFingerprint = null;
     },
   }));
 
@@ -160,15 +168,33 @@
       console.error('Failed to copy:', err);
     }
   }
+
+  function handleLogout() {
+    // Clear all state
+    jwtToken = null;
+    isLoggedIn = false;
+    challenge = null;
+    pgpFingerprint = null;
+    asn = '';
+    signedChallenge = '';
+    publicKey = '';
+
+    // Clear localStorage
+    if (typeof window !== 'undefined') {
+      localStorage.removeItem('autopeer_token');
+      localStorage.removeItem('autopeer_asn');
+      localStorage.removeItem('autopeer_challenge');
+      localStorage.removeItem('autopeer_pgp_fingerprint');
+    }
+  }
 </script>
 
 <div class="max-w-2xl mx-auto p-6">
-  <div class="mb-8">
-    <h1 class="text-3xl font-bold mb-2">DN42 AutoPeer</h1>
-    <p class="text-gray-600">Automatic peering setup for DN42 network</p>
-  </div>
-
-  {#if !challenge}
+  {#if isLoggedIn}
+    <!-- Logged in - Show deployment form -->
+    <DeploymentForm asn={parseInt(asn, 10)} onLogout={handleLogout} />
+  {:else}
+    {#if !challenge}
     <div class="bg-white rounded-lg shadow-md p-6">
       <h2 class="text-xl font-semibold mb-4">Step 1: Initialize Peering</h2>
       <p class="text-gray-600 mb-6">
@@ -351,36 +377,6 @@
           </p>
         </div>
 
-        <div>
-          <label for="wgPublicKey" class="block text-sm font-medium text-gray-700 mb-2">
-            Your WireGuard Public Key
-          </label>
-          <input
-            type="text"
-            id="wgPublicKey"
-            bind:value={wgPublicKey}
-            placeholder="your_base64_public_key="
-            required
-            disabled={verifyMutation.isPending || !challenge}
-            class="w-full px-4 py-2 border rounded-md font-mono text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent disabled:bg-gray-100 disabled:cursor-not-allowed {wgPublicKey && isValidWgPublicKey(wgPublicKey) ? 'border-green-500' : 'border-gray-300'}"
-          />
-        </div>
-
-        <div>
-          <label for="endpoint" class="block text-sm font-medium text-gray-700 mb-2">
-            Your WireGuard Endpoint
-          </label>
-          <input
-            type="text"
-            id="endpoint"
-            bind:value={endpoint}
-            placeholder="IPv4:port, [IPv6]:port, or domain:port (e.g., 1.2.3.4:51820, [2001:db8::1]:51820, or peer.example.com:51820)"
-            required
-            disabled={verifyMutation.isPending || !challenge}
-            class="w-full px-4 py-2 border rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent disabled:bg-gray-100 disabled:cursor-not-allowed {endpoint && isValidEndpoint(endpoint) ? 'border-green-500' : 'border-gray-300'}"
-          />
-        </div>
-
         {#if verifyMutation.isError}
           <div class="flex items-start gap-2 p-4 bg-red-50 border border-red-200 rounded-md">
             <AlertCircle class="w-5 h-5 text-red-600 flex-shrink-0 mt-0.5" />
@@ -393,12 +389,13 @@
 
         <button
           type="submit"
-          disabled={verifyMutation.isPending || !challenge || !signedChallenge || !publicKey || !wgPublicKey || !endpoint}
+          disabled={verifyMutation.isPending || !challenge || !signedChallenge || !publicKey}
           class="w-full px-4 py-2 bg-blue-600 text-white font-medium rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 disabled:bg-gray-400 disabled:cursor-not-allowed transition-colors"
         >
-          {verifyMutation.isPending ? 'Verifying...' : 'Verify & Complete'}
+          {verifyMutation.isPending ? 'Verifying...' : 'Verify & Login'}
         </button>
       </form>
     </div>
+  {/if}
   {/if}
 </div>

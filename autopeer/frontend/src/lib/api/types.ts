@@ -18,27 +18,35 @@ export const VerifyRequestSchema = z.object({
   asn: z.number().int(),
   signed_challenge: z.string(),
   public_key: z.string(),
-  wg_public_key: z.string(),
-  endpoint: z.string(),
 });
 
 export const VerifyResponseSchema = z.object({
   token: z.string(),
-  peer_public_key: z.string(),
-  wireguard_config: z.string(),
+});
+
+export const DeploymentInfoSchema = z.object({
+  interface_address: z.string(),
+  listen_port: z.number(),
+  our_public_key: z.string(),
+  our_endpoint: z.string(),
+  bgp_neighbor: z.string(),
+  bgp_local_as: z.number(),
+  bgp_remote_as: z.number(),
+  is_active: z.boolean(),
 });
 
 export type VerifyRequest = z.infer<typeof VerifyRequestSchema>;
 export type VerifyResponse = z.infer<typeof VerifyResponseSchema>;
+export type DeploymentInfo = z.infer<typeof DeploymentInfoSchema>;
 
 // Deploy Peering
 export const DeployRequestSchema = z.object({
-  asn: z.number().int(),
+  wg_public_key: z.string(),
+  endpoint: z.string(),
 });
 
 export const DeployResponseSchema = z.object({
-  status: z.string(),
-  interface: z.string(),
+  deployment: DeploymentInfoSchema,
 });
 
 export type DeployRequest = z.infer<typeof DeployRequestSchema>;

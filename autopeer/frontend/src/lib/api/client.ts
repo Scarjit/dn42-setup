@@ -8,6 +8,7 @@ import {
   ConfigResponseSchema,
   UpdateRequestSchema,
   UpdateResponseSchema,
+  DeploymentInfoSchema,
   type InitRequest,
   type InitResponse,
   type VerifyRequest,
@@ -17,6 +18,7 @@ import {
   type ConfigResponse,
   type UpdateRequest,
   type UpdateResponse,
+  type DeploymentInfo,
   type ApiError,
 } from './types';
 
@@ -64,7 +66,7 @@ class AutoPeerClient {
     return VerifyResponseSchema.parse(response);
   }
 
-  async deployPeering(data: DeployRequest, token: string): Promise<DeployResponse> {
+  async deployPeering(token: string, data: DeployRequest): Promise<DeployResponse> {
     const validated = DeployRequestSchema.parse(data);
     const response = await this.request<unknown>('/deploy', {
       method: 'POST',
@@ -101,6 +103,36 @@ class AutoPeerClient {
   async deletePeering(token: string): Promise<UpdateResponse> {
     const response = await this.request<unknown>('', {
       method: 'DELETE',
+      headers: {
+        Authorization: `Bearer ${token}`,
+      },
+    });
+    return UpdateResponseSchema.parse(response);
+  }
+
+  async getStatus(token: string): Promise<DeploymentInfo> {
+    const response = await this.request<unknown>('/status', {
+      method: 'GET',
+      headers: {
+        Authorization: `Bearer ${token}`,
+      },
+    });
+    return DeploymentInfoSchema.parse(response);
+  }
+
+  async activatePeering(token: string): Promise<UpdateResponse> {
+    const response = await this.request<unknown>('/activate', {
+      method: 'POST',
+      headers: {
+        Authorization: `Bearer ${token}`,
+      },
+    });
+    return UpdateResponseSchema.parse(response);
+  }
+
+  async deactivatePeering(token: string): Promise<UpdateResponse> {
+    const response = await this.request<unknown>('/deactivate', {
+      method: 'POST',
       headers: {
         Authorization: `Bearer ${token}`,
       },

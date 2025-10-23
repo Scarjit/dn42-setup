@@ -64,6 +64,41 @@ impl WgKeypair {
             public_key,
         })
     }
+
+    /// Derive public key from a private key using wg command
+    pub fn derive_public_key(private_key: &str) -> Result<String, String> {
+        let mut child = Command::new("wg")
+            .arg("pubkey")
+            .stdin(std::process::Stdio::piped())
+            .stdout(std::process::Stdio::piped())
+            .spawn()
+            .map_err(|e| format!("Failed to spawn wg pubkey: {}", e))?;
+
+        // Write private key to stdin
+        use std::io::Write;
+        if let Some(mut stdin) = child.stdin.take() {
+            stdin
+                .write_all(private_key.as_bytes())
+                .map_err(|e| format!("Failed to write to wg pubkey stdin: {}", e))?;
+        }
+
+        let public_output = child
+            .wait_with_output()
+            .map_err(|e| format!("Failed to wait for wg pubkey: {}", e))?;
+
+        if !public_output.status.success() {
+            return Err(format!(
+                "wg pubkey failed: {}",
+                String::from_utf8_lossy(&public_output.stderr)
+            ));
+        }
+
+        let public_key = String::from_utf8_lossy(&public_output.stdout)
+            .trim()
+            .to_string();
+
+        Ok(public_key)
+    }
 }
 
 /// Deploy a WireGuard configuration
@@ -89,6 +124,20 @@ pub fn deploy_config(config_content: &str, interface_name: &str) -> Result<(), S
     }
 
     Ok(())
+}
+
+/// Check if a WireGuard interface is currently active
+pub fn is_interface_active(interface_name: &str) -> bool {
+    // Check if the interface exists using `wg show <interface>`
+    let output = Command::new("wg")
+        .arg("show")
+        .arg(interface_name)
+        .output();
+
+    match output {
+        Ok(result) => result.status.success(),
+        Err(_) => false,
+    }
 }
 
 /// Remove a WireGuard configuration

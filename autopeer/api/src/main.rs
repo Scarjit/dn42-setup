@@ -40,7 +40,10 @@ async fn main() {
         .route("/peering/verify", post(api::verify_peering))
         .route("/peering/deploy", post(api::deploy_peering))
         .route("/peering/config", get(api::get_config))
+        .route("/peering/status", get(api::get_status))
         .route("/peering/update", patch(api::update_peering))
+        .route("/peering/activate", post(api::activate_peering))
+        .route("/peering/deactivate", post(api::deactivate_peering))
         .route("/peering", delete(api::delete_peering))
         .layer(CookieManagerLayer::new())
         .with_state(app_config);
