@@ -1,9 +1,7 @@
 # scarjit.dn42 - Looking Glass
 
-https://scarjit.dn42 {
+http://scarjit.dn42 {
     bind 172.20.13.1 fd30:366:4000::1
-
-    import tls.caddy
 
     handle /health {
         respond "healthy\n" 200

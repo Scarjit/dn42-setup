@@ -1,9 +1,7 @@
 # linnenberg.dn42 - linnenberg.dev proxy
 
-https://linnenberg.dn42 {
+http://linnenberg.dn42 {
     bind 172.20.13.2 fd30:366:4000::2
-
-    import tls.caddy
 
     reverse_proxy https://[2a01:4f9:6a:180f::2] {
         header_up Host linnenberg.dev
