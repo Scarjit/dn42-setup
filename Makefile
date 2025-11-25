@@ -7,7 +7,7 @@ WG_DIR = wireguard
 SYSTEMD_DIR = systemd
 SYSTEMD_NETWORKD_DIR = systemd-networkd
 BIRD_LG_DIR = bird-lg
-NGINX_DIR = nginx
+CADDY_DIR = caddy
 DNS_DIR = dns
 NSD_DIR = nsd
 IPTABLES_DIR = iptables
@@ -15,12 +15,12 @@ REMOTE_BIRD_DIR = /etc/bird
 REMOTE_WG_DIR = /etc/wireguard
 REMOTE_SYSTEMD_DIR = /etc/systemd/system
 REMOTE_SYSTEMD_NETWORKD_DIR = /etc/systemd/network
-REMOTE_NGINX_DIR = /etc/nginx/sites-available
+REMOTE_CADDY_DIR = /etc/caddy
 REMOTE_UNBOUND_DIR = /etc/unbound
 REMOTE_NSD_DIR = /etc/nsd
 REMOTE_IPTABLES_DIR = /etc/iptables
 
-.PHONY: help deploy deploy-bird deploy-wireguard deploy-systemd deploy-bird-lg deploy-nginx deploy-dns deploy-nsd deploy-iptables status routes clean
+.PHONY: help deploy deploy-bird deploy-wireguard deploy-systemd deploy-bird-lg deploy-caddy deploy-dns deploy-nsd deploy-iptables status routes clean update-certstore
 
 help:
 	@echo "DN42 Configuration Deployment"
@@ -31,7 +31,7 @@ help:
 	@echo "  deploy-wireguard  - Deploy WireGuard configurations and restart tunnels"
 	@echo "  deploy-systemd    - Deploy systemd units and reload"
 	@echo "  deploy-bird-lg    - Deploy Bird-LG-Go Looking Glass"
-	@echo "  deploy-nginx      - Deploy nginx configurations and reload"
+	@echo "  deploy-caddy      - Deploy nginx configurations and reload"
 	@echo "  deploy-dns        - Deploy unbound DNS configuration and restart service"
 	@echo "  deploy-nsd        - Deploy NSD authoritative DNS server and zones"
 	@echo "  deploy-iptables   - Deploy iptables rules for DN42 NAT"
@@ -169,27 +169,27 @@ deploy-bird-lg:
 	@echo ""
 	@ssh $(HOST) "sudo systemctl status bird-lg-frontend.service --no-pager -l" || true
 
-deploy-nginx:
-	@echo "==> Deploying nginx configurations to $(HOST)..."
-	@for conf in $(NGINX_DIR)/*.conf; do \
+deploy-caddy:
+	@echo "==> Deploying Caddy configurations to $(HOST)..."
+	@echo "  -> Uploading Caddyfile"
+	@scp $(CADDY_DIR)/Caddyfile $(HOST):/tmp/Caddyfile
+	@ssh $(HOST) "sudo mv /tmp/Caddyfile $(REMOTE_CADDY_DIR)/Caddyfile && sudo chmod 644 $(REMOTE_CADDY_DIR)/Caddyfile"
+	@for conf in $(CADDY_DIR)/*.caddy; do \
 		if [ -f "$$conf" ]; then \
 			filename=$$(basename "$$conf"); \
 			echo "  -> Uploading $$filename"; \
 			scp "$$conf" $(HOST):/tmp/$$filename; \
-			ssh $(HOST) "sudo mv /tmp/$$filename $(REMOTE_NGINX_DIR)/$$filename && sudo chmod 644 $(REMOTE_NGINX_DIR)/$$filename"; \
-			sitename=$$(basename "$$conf" .conf); \
-			echo "  -> Enabling site: $$sitename"; \
-			ssh $(HOST) "sudo ln -sf $(REMOTE_NGINX_DIR)/$$filename /etc/nginx/sites-enabled/$$filename 2>/dev/null || true"; \
+			ssh $(HOST) "sudo mv /tmp/$$filename $(REMOTE_CADDY_DIR)/$$filename && sudo chmod 644 $(REMOTE_CADDY_DIR)/$$filename"; \
 		fi \
 	done
-	@echo "  -> Testing nginx configuration"
-	@if ssh $(HOST) "sudo nginx -t" > /dev/null 2>&1; then \
+	@echo "  -> Validating Caddy configuration"
+	@if ssh $(HOST) "sudo caddy validate --config $(REMOTE_CADDY_DIR)/Caddyfile" > /dev/null 2>&1; then \
 		echo "  -> Configuration is valid"; \
-		echo "  -> Reloading nginx"; \
-		ssh $(HOST) "sudo systemctl reload nginx"; \
-		echo "==> Nginx deployment complete!"; \
+		echo "  -> Reloading Caddy"; \
+		ssh $(HOST) "sudo systemctl reload caddy"; \
+		echo "==> Caddy deployment complete!"; \
 	else \
-		echo "  -> ERROR: Nginx configuration test failed!"; \
+		echo "  -> ERROR: Caddy configuration validation failed!"; \
 		echo "  -> Changes were uploaded but NOT applied"; \
 		exit 1; \
 	fi
@@ -265,3 +265,20 @@ deploy-nsd:
 		echo "  -> Changes were uploaded but NOT applied"; \
 		exit 1; \
 	fi
+
+update-certstore:
+	@echo "==> Updating cert store on $(HOST)"
+	@echo "  -> Creating certificate directory"
+	@ssh $(HOST) "sudo mkdir -p /usr/share/ca-certificates/extra"
+	@echo "  -> Downloading DN42 root CA certificate"
+	@ssh $(HOST) "sudo wget -q --no-check-certificate https://ca.dn42/crt/root-ca.crt -O /usr/share/ca-certificates/extra/dn42.crt"
+	@echo "  -> Checking if certificate is in ca-certificates.conf"
+	@if ! ssh $(HOST) "grep -q 'extra/dn42.crt' /etc/ca-certificates.conf 2>/dev/null"; then \
+		echo "  -> Adding certificate to ca-certificates.conf"; \
+		ssh $(HOST) "echo 'extra/dn42.crt' | sudo tee -a /etc/ca-certificates.conf > /dev/null"; \
+	else \
+		echo "  -> Certificate already in ca-certificates.conf"; \
+	fi
+	@echo "  -> Updating certificate store"
+	@ssh $(HOST) "sudo update-ca-certificates"
+	@echo "==> Certificate store update complete!"

@@ -1,0 +1,11 @@
+{
+    # Use DN42 ACME service for certificates
+    acme_ca https://acme.burble.dn42/v1/dn42/acme/directory
+    acme_ca_root /usr/share/ca-certificates/extra/dn42.crt
+
+    # Check for renewal every 5 days (as recommended)
+    renew_interval 5d
+}
+
+# Import site configurations
+import /etc/caddy/*.dn42.caddy

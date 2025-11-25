@@ -5,7 +5,7 @@ $TTL 3600
 
 ; SOA record
 @       IN      SOA     ns1.linnenberg.dn42. ferdinand.linnenberg.dev. (
-                        2025102101      ; Serial (YYYYMMDDNN)
+                        2025112501      ; Serial (YYYYMMDDNN)
                         7200            ; Refresh
                         3600            ; Retry
                         1209600         ; Expire
@@ -23,3 +23,4 @@ ns1     IN      A       172.20.13.2
 
 ; Main domain A record
 @       IN      A       172.20.13.2
+@       IN      AAAA    fd30:366:4000::2

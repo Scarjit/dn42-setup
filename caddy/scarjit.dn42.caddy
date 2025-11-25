@@ -1,0 +1,23 @@
+# scarjit.dn42 - Looking Glass
+
+https://scarjit.dn42 {
+    bind 172.20.13.1 fd30:366:4000::1
+
+    import tls.caddy
+
+    handle /health {
+        respond "healthy\n" 200
+    }
+
+    handle {
+        reverse_proxy http://127.0.0.1:5000 {
+            header_up Host {host}
+            header_up X-Real-IP {remote_host}
+
+            transport http {
+                dial_timeout 60s
+                response_header_timeout 60s
+            }
+        }
+    }
+}

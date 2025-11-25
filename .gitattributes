@@ -1,3 +1,4 @@
 wireguard/*.conf filter=git-crypt diff=git-crypt
 dnssec-keys/*.private filter=git-crypt diff=git-crypt
+nsd/zones/*.private filter=git-crypt diff=git-crypt
 autopeer/api/tests/fixtures/gpg/test-private.asc filter=git-crypt diff=git-crypt
